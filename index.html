@@ -994,7 +994,7 @@ function noterDepenseDuJour() { LS.set('derDep', auj()); }
 function estCourante(cat) { const c = catMap()[cat]; return !!c && c.type === 'Dépense' && VAR.includes(c.groupe); }
 // Catégories qui NE cassent PAS un jour « sans dépense » (les courses sont un besoin, pas un craquage).
 // Par défaut : celles dont le nom évoque les courses. Modifiable dans Progrès › Défis › Séries.
-const RE_COURSES = /courses|alimentation|supermarch|[ée]picerie/i;
+const RE_COURSES = /courses|alimentation|supermarch|[ée]picerie|cantine|self|restau(rant)? d.entreprise/i;
 function exclusSerie() {
   const p = getPref('jeu', null);
   if (p && Array.isArray(p.exclus)) return p.exclus;
@@ -2970,7 +2970,7 @@ const SAISONS_FIXES = [{ id: 'novsobre', nom: 'Novembre sobre', rar: 'rare', cle
 function etatSaisonEv(d, y, J) {
   const [a, b] = d.fen(y), A = auj(); let cur = 0, restant = 0;
   for (let k = a; k <= b; k = addJ(k, 1)) { const v = J.get(k); if (v === true) cur++; else if (k >= A) restant++; }
-  const ok = cur >= d.max; return { d, y, a, b, cur, ok, rate: !ok && cur + restant < d.max, enCours: A >= a && A <= addJ(b, 3) };
+  const ok = cur >= d.max; return { d, y, a, b, cur, ok, rate: !ok && cur + restant < d.max, enCours: A >= a && A <= b && b >= JEU_DEBUT.iso }; // seulement pendant l'événement, et jamais avant le début du jeu
 }
 function saisonsGagnees() { const J = new Map(joursJeu()), L = []; for (let y = 2026; y <= now.getFullYear(); y++) SAISONS_EV.forEach(d => { const e = etatSaisonEv(d, y, J); if (e.ok) L.push(e); }); return L; }
 function saisonObtenue(id) { const f = etatJeu().f; const fx = SAISONS_FIXES.find(x => x.id === id); return fx ? (f[fx.cle] || 0) > 0 : (f.saisonsOk || []).some(e => e.d.id === id); }
