@@ -709,6 +709,9 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 .pbas.decouvert{border-color:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 18%,transparent);animation:decPulse 1.6s ease-in-out infinite}
 @keyframes decPulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--bad) 8%,transparent)}}@media (prefers-reduced-motion:reduce){.pbas.decouvert{animation:none}}
 .decban{background:var(--bad);color:#fff;font-family:var(--mono);font-size:10.5px;letter-spacing:1px;font-weight:600;border-radius:6px;padding:5px 8px;margin-bottom:8px;text-align:center}
+.anoml{padding-left:16px;margin:8px 0 0}.anoml li{margin-bottom:10px}.anoml small{display:block;opacity:.8;margin-top:2px}.anomacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.anomb{font:inherit;font-size:12px;font-weight:600;padding:4px 9px;border:1px solid currentColor;border-radius:6px;color:inherit}.anomb.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.anomli{display:block;width:100%;text-align:left;font:inherit;color:inherit;padding:4px 0}.anomli small{display:block;opacity:.8;margin-top:2px}.anomli b{display:inline-block;margin-top:5px;padding:3px 8px;border:1px solid currentColor;border-radius:6px;font-weight:600;font-size:12px}
 </style>
 </head>
 <body>
@@ -739,7 +742,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '7.8';
+const VERSION = '8.0';
 // Fonctionnalités masquables (Réglages). Masquer = ne plus afficher ; les données continuent d'être enregistrées.
 const FONCS = [
   ['pj', 'Montant par jour', 'sous le grand chiffre et à la saisie'],
@@ -1248,7 +1251,17 @@ function blocAnomalies() {
   const items = lines.filter(l => l.startsWith('•')).map(l => l.replace(/^•\s*/, ''));
   const rap = lines.filter(l => l.startsWith('📅')).map(l => l.replace(/^📅\s*/, ''));
   let h = '';
-  if (head) h += `<button class="alert" data-act="anom"><b style="font-weight:600">${esc(head.replace(/^⚠\s*/, '⚠ '))}</b><span class="muted"> · ${S.anomOpen ? 'masquer' : 'voir'}</span>${S.anomOpen ? '<ul>' + items.map(i => '<li>' + esc(i) + '</li>').join('') + '</ul>' : ''}</button>`;
+  // Anomalies : on peut dire « c'est voulu ».
+  //  - Doublon possible, Déjà dans l'Échéancier, Montant inhabituel → un ✓ est ajouté à la fin du libellé de la ligne (le fichier l'ignore ensuite).
+  //  - Autres anomalies sans ligne précise → « Vérifié, masquer » (mémorisé sur ce téléphone, revient si le texte change).
+  const masq = LS.get('anomMasquees', []), okLoc = S.anomOk || [];
+  const vis = items.filter(i => !masq.includes(i) && !okLoc.includes(i));
+  const ligneAnom = i => { const m = /Journal, ligne (\d+)/.exec(i), e = m && S.journal.find(x => x.row === +m[1] && !x.deleted);
+    const voulu = /^(Doublon possible|Déjà dans l|Montant inhabituel)/.test(i);
+    const act = e && voulu ? `<button class="anomb ok" data-act="anom-voulu" data-id="${e.id}" data-i="${esc(i)}">✓ C'est voulu</button><button class="anomb" data-act="edit" data-id="${e.id}">Ouvrir la ligne ›</button>`
+      : e ? `<button class="anomb" data-act="edit" data-id="${e.id}">Corriger la ligne ›</button>` : `<button class="anomb" data-act="anom-masq" data-i="${esc(i)}">✓ Vérifié, masquer</button>`;
+    return `<li><span>${esc(i)}</span>${e ? `<small>${esc(e.lib)} · ${e2(e.montant)} € · ${esc(e.mois)}</small>` : ''}<div class="anomacts">${act}</div></li>`; };
+  if (head && vis.length) h += `<div class="alert"><button data-act="anom" style="display:block;width:100%;text-align:left"><b style="font-weight:600">⚠ ${vis.length} ANOMALIE${vis.length > 1 ? 'S' : ''} À VÉRIFIER</b><span class="muted"> · ${S.anomOpen ? 'masquer' : 'voir'}</span></button>${S.anomOpen ? '<ul class="anoml">' + vis.map(ligneAnom).join('') + '</ul><div class="note" style="display:block;margin-top:6px">« C\'est voulu » ajoute ✓ à la fin du libellé : le fichier ne signale plus cette ligne.</div>' : ''}</div>`;
   const fait = LS.get('ctrlFait', 0) === nowYM(), vus = LS.get('rappelsVus', []);
   rap.forEach(r => { const k = nowYM() + '|' + r; if (vus.includes(k) || (/solde/i.test(r) && fait)) return;
     h += `<div class="rap">${/solde/i.test(r) ? `<button class="note" data-act="ctrl" style="flex:1;text-align:left;margin:0">${ico.cal}<span>Nouveau mois : note ton solde bancaire <b style="font-weight:500;color:var(--ink);text-decoration:underline">C'est parti ›</b></span></button>` : `<div class="note" style="flex:1;margin:0">${ico.cal}<span>${esc(r.replace(/^Rappel[^:]*:\s*/, ''))}</span></div>`}<button class="rapx" data-act="rap-ok" data-k="${esc(k)}" aria-label="Masquer ce rappel">✕</button></div>`; });
@@ -4054,6 +4067,12 @@ document.addEventListener('click', ev => {
     case 'tuto-ok': LS.set('tutoVu', true); if (S.retourSaisie) { S.form = S.retourSaisie; S.retourSaisie = null; rendreForm(); } else fermer(); break;
     case 'vit': basculerVitrine(el.dataset.id); break;
     case 'dmsg': if (el.dataset.m) toast(el.dataset.m); break;
+    case 'anom-voulu': { const e = trouver(el.dataset.id); if (!e) break; const avant = e.lib, i0 = el.dataset.i;
+      if (!/✓\s*$/.test(e.lib || '')) { e.lib = String(e.lib || e.cat).trim() + ' ✓'; e.pending = true; enfiler({ op: 'update', id: e.id }); }
+      S.anomOk = (S.anomOk || []).concat(i0); rendre(true);
+      toast('Noté comme voulu ✓', 'ANNULER', () => { e.lib = avant; e.pending = true; S.anomOk = (S.anomOk || []).filter(x => x !== i0); enfiler({ op: 'update', id: e.id }); rendre(true); }); break; }
+    case 'anom-masq': { const i0 = el.dataset.i; LS.set('anomMasquees', LS.get('anomMasquees', []).concat(i0).slice(-50)); rendre(true); toast('Anomalie masquée', 'ANNULER', () => { LS.set('anomMasquees', LS.get('anomMasquees', []).filter(x => x !== i0)); rendre(true); }); break; }
+    case 'anom-ok': { const e = trouver(el.dataset.id); if (!e) break; ouvrirSaisie(e); if (S.form && !/✓\s*$/.test(S.form.lib || '')) { S.form.lib = ((S.form.lib || e.cat).trim() + ' ✓'); rendreForm(); toast('✓ ajouté au libellé : enregistre si c\'est bien un achat différent du prélèvement'); } break; }
     case 'info': S.form = { mode: 'info', k: el.dataset.k }; rendreForm(); ouvrirSheet(); break;
     case 'amb-go': LS.set(cleCos('ambiance'), el.dataset.a); appliquerCosmetiques(); rendre(true); toast('Ambiance appliquée · change-la dans Progrès › Style'); break;
     case 'videotheque': S.form = { mode: 'videotheque' }; rendreForm(); ouvrirSheet(); break;
