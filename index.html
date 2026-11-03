@@ -700,6 +700,8 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 .vidrow{display:flex;gap:10px;margin-top:10px;justify-content:space-between}
 .vidgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px;margin-top:12px}.vidgrid>div{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px}.vidgrid small{font-size:10.5px;line-height:1.2}.vidgrid em{font-style:normal;font-family:var(--mono);font-size:8.5px;color:var(--ink3);letter-spacing:.6px}
 .evgrid>div{display:flex;flex-direction:column;align-items:center}
+.dsrow{margin-top:2px}.dsrow span{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--ink3)}.dsrow b{color:var(--ink);font-weight:600}
+.aconf{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--rule)}.aconf>button:first-child{flex:1;min-width:0;text-align:left}.aconf b{display:block;font-size:14px}.aconf small{font-size:11.5px;color:var(--ink3)}.aconf .chip{flex:none;margin:0}
 </style>
 </head>
 <body>
@@ -730,7 +732,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '7.0';
+const VERSION = '7.5';
 // Fonctionnalités masquables (Réglages). Masquer = ne plus afficher ; les données continuent d'être enregistrées.
 const FONCS = [
   ['pj', 'Montant par jour', 'sous le grand chiffre et à la saisie'],
@@ -751,7 +753,7 @@ const on = k => !LS.get('off', []).includes(k);
 const progresVisible = () => on('defi') || on('series') || on('bilan') || on('jeu') || ['saison', 'semaine', 'escalier', 'tirelires', 'voyage', 'objectif', 'resume'].some(k => ouvert(k)) || FEAT.some(f => !dispo(f[0]));
 // Optionnel : lien proposé par défaut au premier lancement. Laisser vide pour la version commune.
 const API_DEFAUT = 'https://script.google.com/macros/s/AKfycbx-9H7hbBT3DNrtQrw3QMwPFXksxf-4rdEqj4SkMsZrcTx3xSCJho0UhhAU3XehyQ56/exec';
-const API_ATTENDUE = '5.1'; // version minimale du script ; les versions plus récentes sont acceptées
+const API_ATTENDUE = '5.2'; // version minimale du script ; les versions plus récentes sont acceptées
 
 /* ================= OUTILS ================= */
 const IN_GAS = typeof google !== 'undefined' && google.script && google.script.run;
@@ -875,7 +877,7 @@ async function pomper() {
       res = await api('add', { ligne: Object.assign(pick(e), { date: e.date || null, uid: e.id }) });
       if (res.ok) { e.row = res.row; e.srv = pick(e); }
     } else if (op.op === 'update') {
-      if (e.row != null) { res = await api('update', { row: e.row, attendu: e.srv, ligne: pick(e) }); if (res.ok) e.srv = pick(e); }
+      if (e.row != null) { res = await api('update', { row: e.row, attendu: e.srv, ligne: Object.assign(pick(e), { date: e.date || null }) }); if (res.ok) e.srv = pick(e); }
     } else if (op.op === 'delete') {
       if (e.row != null) {
         res = await api('delete', { row: e.row, attendu: e.srv });
@@ -985,12 +987,23 @@ function serieVert() {
 // Mois terminés d'affilée où ce budget est tenu (pour un budget annuel : dans le rythme à fin de mois)
 function serieBudget(nom) {
   let [y, m] = reculer(now.getFullYear(), now.getMonth() + 1), n = 0;
-  while (n < 60 && moisActif(y, m)) { const b = budgetDe(nom, y, m); if (!b || b.reste < -0.5) break; n++; [y, m] = reculer(y, m); }
+  // Point de départ : novembre 2026 (début du jeu). Les mois d'avant ne comptent pas.
+  while (n < 60 && moisActif(y, m) && ymNum(y, m) >= ymNum(JEU_DEBUT.y, JEU_DEBUT.m)) { const b = budgetDe(nom, y, m); if (!b || b.reste < -0.5) break; n++; [y, m] = reculer(y, m); }
   return n;
 }
 // Jours sans dépense courante : suivi sur ce téléphone (le Journal n'a pas de date au jour près).
 const auj = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-function noterDepenseDuJour() { LS.set('derDep', auj()); }
+function noterDepenseDuJour(iso) { iso = iso || auj(); const d = LS.get('derDep', null); if (!d || iso > d) LS.set('derDep', iso); }
+// Date proposée par défaut : aujourd'hui pour le mois en cours, le dernier jour du mois pour un mois passé
+const pad2 = n => String(n).padStart(2, '0');
+// Une saisie devient un « achat à venir » si le mois est à venir OU si sa date est après aujourd'hui (avant-première, billet réservé…)
+const estPrevu = f => statut(f.y, f.m) === 'futur' || !!(f.date && f.date > auj());
+const dateDefaut = (y, m) => statut(y, m) === 'cours' ? auj() : statut(y, m) === 'passe' ? y + '-' + pad2(m) + '-' + pad2(dim(y, m)) : null;
+function libDate(iso) {
+  if (!iso) return 'DATE NON PRÉCISÉE'; const A = auj();
+  if (iso === A) return "AUJOURD'HUI"; if (iso === addJ(A, -1)) return 'HIER'; if (iso === addJ(A, -2)) return 'AVANT-HIER';
+  const d = new Date(iso + 'T00:00:00'); return ['DIM.', 'LUN.', 'MAR.', 'MER.', 'JEU.', 'VEN.', 'SAM.'][d.getDay()] + ' ' + d.getDate() + ' ' + MC[d.getMonth()].toUpperCase();
+}
 function estCourante(cat) { const c = catMap()[cat]; return !!c && c.type === 'Dépense' && VAR.includes(c.groupe); }
 // Catégories qui NE cassent PAS un jour « sans dépense » (les courses sont un besoin, pas un craquage).
 // Par défaut : celles dont le nom évoque les courses. Modifiable dans Progrès › Défis › Séries.
@@ -1107,7 +1120,7 @@ function defiTxt(x) {
 }
 function serieTxt(x) {
   if (!on('series') || x.sa || statut(S.y, S.m) !== 'cours') return '';
-  const n = serieBudget(x.c.nom); return n >= 2 ? ` · <span class="c-ok">tenu ${n} mois d'affilée</span>` : '';
+  const n = serieBudget(x.c.nom); return n >= 1 ? ` · <span class="c-ok">tenu ${n === 1 ? '1 mois' : n + " mois d'affilée"}</span>` : '';
 }
 function trierBudgets(l) {
   if (LS.get('ordreBud', 'urgence') === 'perso') return l;
@@ -1363,12 +1376,13 @@ function vueAccueil() {
       h += `<button class="brow" data-act="budget" data-cat="${esc(x.c.nom)}"><div class="bhead"><span class="bname">${esc(x.c.nom)}${dfi && dfi.cat === x.c.nom ? ` <span class="tagdefi ${dfi.ok ? '' : 'rate'}">DÉFI ${e0(dfi.montant)}</span>` : ''}</span><span class="bright"><span class="${x.reste < 0 ? 'c-bad' : ''}">${x.reste < 0 ? '−' + e0(-x.reste) : e0(x.reste)}</span>${st}</span></div>
         ${x.an && x.annuel > 0
           ? `<div class="bar an"><i style="width:${Math.min(100, x.dep / x.annuel * 100)}%;background:${col}"></i><b style="left:${Math.min(100, x.bud / x.annuel * 100)}%"></b></div>
-        <div class="bsub">${e0(x.dep)} / ${e0(x.bud)} à fin ${MC[S.m - 1]} · ce mois ${e0(x.mois)}${defiTxt(x) || serieTxt(x)}</div>`
+        <div class="bsub">${e0(x.dep)} / ${e0(x.bud)} à fin ${MC[S.m - 1]} · ce mois ${e0(x.mois)}${defiTxt(x) + serieTxt(x)}</div>`
           : `<div class="bar mk"><i style="width:${w}%;background:${col}"></i>${statut(S.y, S.m) === 'cours' && !x.sa && on('reperes') ? `<b style="left:${now.getDate() / dim(S.y, S.m) * 100}%"></b>` : ''}</div>
-        <div class="bsub">${e0(x.dep)} / ${e0(x.bud)} · ce mois${defiTxt(x) || serieTxt(x)}</div>`}</button>`;
+        <div class="bsub">${e0(x.dep)} / ${e0(x.bud)} · ce mois${defiTxt(x) + serieTxt(x)}</div>`}</button>`;
     });
     if (tous.length > 5) h += `<button class="chip" style="margin-top:10px" data-act="allbud">${S.allBud ? 'Afficher moins ▴' : 'Tous les budgets (' + tous.length + ') ▾'}</button>`;
   }
+  if (b.st === 'cours') h += blocAConfirmer();
   if (b.st === 'cours') {
     const pr = prochains(5);
     if (pr.length) {
@@ -1405,7 +1419,7 @@ function htmlListe() {
   const rows = l.map(({ e, c }) => {
     const t = c ? c.type : '';
     if (t === 'Revenu' || t === 'Retrait') rev += e.montant; else dep += e.montant;
-    return `<button class="jl ${e.pending ? 'pend' : ''} ${e.nw ? 'nw' : ''}" data-act="edit" data-id="${e.id}"><div class="l"><div>${esc(e.lib || e.cat)}</div><div class="c">${S.filtre.q ? esc(MC[e.m - 1]) + ' · ' : ''}${esc(e.cat)}${c ? '' : ' · catégorie inconnue'}${e.pending ? ' · envoi…' : ''}</div></div>
+    return `<button class="jl ${e.pending ? 'pend' : ''} ${e.nw ? 'nw' : ''}" data-act="edit" data-id="${e.id}"><div class="l"><div>${esc(e.lib || e.cat)}</div><div class="c">${S.filtre.q ? esc(MC[e.m - 1]) + ' · ' : ''}${esc(e.cat)}${e.date ? ' · le ' + (+e.date.slice(8)) + '/' + e.date.slice(5, 7) : ''}${c ? '' : ' · catégorie inconnue'}${e.pending ? ' · envoi…' : ''}</div></div>
       ${montantLigne(t, e.montant)}</button>`;
   }).join('');
   return `<div class="sec" style="margin-top:14px"><span>${l.length} LIGNE${l.length > 1 ? 'S' : ''}${S.filtre.q ? ' EN ' + S.y : ''}</span><span>−${e0(dep)}${rev ? ' · +' + e0(rev) : ''}</span></div>` + rows;
@@ -1451,8 +1465,8 @@ function suggestions(cat) {
 function ouvrirSaisie(e, dup) {
   const t = e ? typeDe(e.cat) : 'Dépense';
   const ym = statut(S.y, S.m) === 'futur' ? { y: now.getFullYear(), m: now.getMonth() + 1 } : { y: S.y, m: S.m };
-  S.form = e && !dup ? { mode: 'edit', id: e.id, row: e.row, type: t, montant: String(e.montant).replace('.', ','), cat: e.cat, lib: e.lib === e.cat ? '' : e.lib, y: e.y || S.y, m: e.m || S.m, all: false, arm: false, jour: null }
-    : { mode: 'add', type: t, montant: e ? String(e.montant).replace('.', ',') : '', cat: e ? e.cat : null, lib: e && e.lib !== e.cat ? e.lib : '', y: ym.y, m: ym.m, all: false, arm: false, jour: null };
+  S.form = e && !dup ? { mode: 'edit', id: e.id, row: e.row, type: t, montant: String(e.montant).replace('.', ','), cat: e.cat, lib: e.lib === e.cat ? '' : e.lib, y: e.y || S.y, m: e.m || S.m, date: e.date || null, all: false, arm: false, jour: null }
+    : { mode: 'add', type: t, montant: e ? String(e.montant).replace('.', ',') : '', cat: e ? e.cat : null, lib: e && e.lib !== e.cat ? e.lib : '', y: ym.y, m: ym.m, date: dateDefaut(ym.y, ym.m), all: false, arm: false, jour: null };
   if (!LS.get('tutoVu', false)) { S.retourSaisie = S.form; S.form = { mode: 'tuto' }; }
   rendreForm(); ouvrirSheet();
 }
@@ -1463,7 +1477,7 @@ const TUTO = [
   ['🐷', 'ÉPARGNE', "Uniquement l'argent que tu <b>mets de côté</b> : versement sur un livret, PEA, assurance vie, crypto… On ne retire jamais depuis cet onglet. C'est ce qui remplit ton objectif d'épargne. Un transfert d'un placement à un autre (livret A → PEA) ne se saisit pas : ça se passe dans ton suivi de patrimoine."],
   ['🔁', 'PRÉLÈVEMENTS RÉGULIERS', "Loyer, abonnements, salaire, virement d'épargne automatique : mets-les une fois dans l'onglet <b>Prévu</b>. Ne les saisis pas en plus ici, sinon ils comptent deux fois."],
   ['👥', "PAYÉ POUR D'AUTRES", "Dans une dépense, touche « Payé pour d'autres aussi » : ta part va dans ton budget, le reste dans « On te doit » jusqu'au remboursement."],
-  ['📅', 'ACHAT À VENIR', "Avance le mois avec › : la ligne devient un achat prévu. Tu la valideras le moment venu."]];
+  ['📅', 'DATE ET ACHAT À VENIR', "La date est celle du jour par défaut. Oublié une dépense hier ? Recule-la avec ‹. Une place d'avant-première, un achat déjà prévu ? Avance la date après aujourd'hui (ou le mois avec ›) : la ligne devient un achat à venir, que tu valideras le jour venu."]];
 function rendreTuto() {
   $('#sheetIn').innerHTML = enteteSheet('COMMENT SAISIR', null) + `<div style="margin-top:8px">${TUTO.map(t => `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--rule)"><span style="font-size:24px;flex:none;width:34px;text-align:center">${t[0]}</span><div style="flex:1;min-width:0"><div style="font-family:var(--mono);font-size:12px;letter-spacing:1.4px;font-weight:600;margin-bottom:3px">${t[1]}</div><div style="font-size:13px;line-height:1.45;color:var(--ink2)">${t[2]}</div></div></div>`).join('')}</div>
     <button class="go" data-act="tuto-ok" style="margin-top:14px">COMPRIS, ON SAISIT</button>`;
@@ -1474,7 +1488,7 @@ function rendreForm() {
   const f = S.form; if (!f) return;
   const R = { videotheque: rendreVideotheque, vitrine: rendreVitrine, xplog: rendreXpLog, xpinfo: rendreXpInfo, tuto: rendreTuto, exclus: rendreExclus, soon: rendreSoon, objedit: rendreObjEdit, resume: rendreResume, esccfg: rendreEscCfg, tiredit: rendreTirEdit, voyedit: rendreVoyEdit, bilmois: rendreBilMois, wrapped: rendreWrapped, remb: rendreRemb, defi: rendreDefi, lien: rendreLien, reglages: rendreReglages, budgets: rendreBudgets, cats: rendreCats, catedit: rendreCatEdit, solde: rendreSolde, ech: rendreEch, av: rendreAv, mois: rendreMoisGrille, fiche: rendreFiche }[f.mode];
   if (R) return R();
-  const fav = favoris(f.type), pins = LS.get('pins', []), futur = statut(f.y, f.m) === 'futur';
+  const fav = favoris(f.type), pins = LS.get('pins', []), moisFutur = statut(f.y, f.m) === 'futur', futur = estPrevu(f);
   if (f.cat && !fav.includes(f.cat) && typeDe(f.cat) === f.type) fav.unshift(f.cat);
   let chips = fav.map(n => `<button class="chip ${f.cat === n ? 'on' : ''}" data-act="cat" data-cat="${esc(n)}">${pins.includes(n) ? '★ ' : ''}${esc(n)}</button>`).join('');
   chips += `<button class="chip" data-act="all">${f.all ? 'Moins ▴' : 'Toutes ▾'}</button>`;
@@ -1489,8 +1503,9 @@ function rendreForm() {
     <div class="seg">${Object.keys(TYPES).map(t => `<button class="${f.type === t ? 'on' : ''}" data-act="type" data-t="${t}">${t.toUpperCase()}</button>`).join('')}</div>
     <div class="amt ${montantNum() ? '' : 'zero'}" id="amt">${f.montant ? esc(f.montant) : '0'} €</div>
     <div class="mrow"><button class="mbtn" data-act="fm:-1" aria-label="Mois précédent">‹</button><span>${moisLabel(f.y, f.m).toUpperCase()}</span><button class="mbtn" data-act="fm:1" aria-label="Mois suivant">›</button></div>
+    ${!moisFutur ? `<div class="mrow dsrow"><button class="mbtn" data-act="fd:-1" aria-label="Jour précédent">‹</button><span>${futur ? 'PRÉVU LE' : 'DÉPENSÉ LE'} · <b>${libDate(f.date)}</b>${futur ? ' · <b class="c-warn">À VENIR</b>' : ''}</span><button class="mbtn" data-act="fd:1" aria-label="Jour suivant" ${f.date && f.date >= f.y + '-' + pad2(f.m) + '-' + pad2(dim(f.y, f.m)) ? 'disabled style="opacity:.3"' : ''}>›</button></div>` : ''}
     ${/^Écart/.test(f.lib || '') ? `<div class="mrow" style="margin-top:2px"><button class="chip" data-act="sgn">± CHANGER LE SIGNE</button></div>` : ''}
-    ${futur && f.mode === 'add' ? `<div class="mrow" style="margin-top:2px"><button class="mbtn" data-act="fj:-1" aria-label="Jour précédent">‹</button><span>${f.jour ? 'LE ' + f.jour : 'JOUR NON PRÉCISÉ'}</span><button class="mbtn" data-act="fj:1" aria-label="Jour suivant">›</button></div>` : ''}
+    ${moisFutur && f.mode === 'add' ? `<div class="mrow" style="margin-top:2px"><button class="mbtn" data-act="fj:-1" aria-label="Jour précédent">‹</button><span>${f.jour ? 'LE ' + f.jour : 'JOUR NON PRÉCISÉ'}</span><button class="mbtn" data-act="fj:1" aria-label="Jour suivant">›</button></div>` : ''}
     <div class="hint" id="hint"></div>
     ${f.type === 'Dépense' && f.mode === 'add' && !futur && ouvert('voyage') && voyageActif() ? `<div class="mrow" style="margin:-4px 0 6px"><button class="chip ${f.voy !== false ? 'on' : ''}" data-act="voy-tog">✈ ${esc(voyageActif().nom)}</button></div>` : ''}
     ${f.type === 'Dépense' && f.mode === 'add' && !futur && on('avances') ? `<div class="mrow" style="margin:-4px 0 6px"><button class="chip ${f.partage ? 'on' : ''}" data-act="partage">👥 PAYÉ POUR D'AUTRES AUSSI</button></div>${f.partage ? `<div class="part">
@@ -1527,7 +1542,7 @@ function majHint() {
   const f = S.form, h = $('#hint'), a = $('#amt'); if (!f || !h) return;
   a.textContent = (f.montant || '0') + ' €'; a.classList.toggle('zero', !montantNum());
   $('#ferr').textContent = '';
-  if (statut(f.y, f.m) === 'futur' && f.mode === 'add') { h.innerHTML = '<span class="muted">Rangé dans tes achats prévus : tu le valideras le moment venu</span>'; return; }
+  if (estPrevu(f) && f.mode === 'add') { h.innerHTML = '<span class="muted">Rangé dans tes achats à venir : tu le valideras le jour venu (onglet Journal ou accueil)</span>'; return; }
   if (!f.cat) { h.innerHTML = '<span class="muted">Choisis une catégorie</span>'; return; }
   const pa = partage(), z = $('#presume');
   if (z) z.innerHTML = !f.noms || !f.noms.length ? 'Choisis qui te doit' : montantNum() ? `Ta part : <b>${e2(pa.moi)} €</b> dans ton budget · ${pa.n > 1 ? 'chacun te doit' : esc(f.noms[0]) + ' te doit'} <b>${e2(pa.chacun)} €</b>${pa.auto ? ' (parts égales)' : ''}` : 'Tape le montant total payé';
@@ -1562,14 +1577,14 @@ function enregistrer() {
   const ecart = /^Écart/.test((f.lib || '').trim());
   if (!(n > 0) && !((ecart || estAv(f.cat)) && n < 0)) { $('#ferr').textContent = 'Tape un montant'; return; }
   if (!f.cat) { $('#ferr').textContent = 'Choisis une catégorie'; return; }
-  const mois = moisLabel(f.y, f.m), futur = statut(f.y, f.m) === 'futur';
+  const mois = moisLabel(f.y, f.m), futur = estPrevu(f);
   if (S.data.mois && S.data.mois.length && !S.data.mois.includes(mois)) { $('#ferr').textContent = mois + " n'existe pas dans ton fichier"; return; }
   let lib = (f.lib || '').trim() || f.cat;
   { const v = ouvert('voyage') && f.mode === 'add' && f.type === 'Dépense' && f.voy !== false ? voyageActif() : null; if (v && !lib.startsWith(v.nom + ' · ')) lib = v.nom + ' · ' + lib; }
   if (futur && f.mode === 'edit') { $('#ferr').textContent = 'Pour un mois à venir : supprime la ligne et crée un achat prévu'; return; }
   S._saveT = Date.now(); vibrer(); sonCaisse();
   if (futur) {
-    const a = { id: uid(), row: null, mois, lib, cat: f.cat, montant: n, jour: f.jour, y: f.y, m: f.m, fait: false, srv: null, pending: true };
+    const a = { id: uid(), row: null, mois, lib, cat: f.cat, montant: n, jour: f.jour || (f.date ? +f.date.slice(8) : null), y: f.y, m: f.m, fait: false, srv: null, pending: true };
     S.data.avenir = S.data.avenir || []; S.data.avenir.push(a);
     fermer(); S.y = a.y; S.m = a.m; S.tab = 'journal'; rendre();
     toast('Prévu pour ' + MOIS[a.m - 1] + ' ' + a.y);
@@ -1581,18 +1596,18 @@ function enregistrer() {
     const objet = (f.lib || '').trim() || f.cat, nouv = [];
     if (pa.moi > 0) nouv.push({ lib, cat: f.cat, montant: pa.moi });
     f.noms.forEach(n => nouv.push({ lib: n + ' · ' + objet, cat: CAT_AV, montant: pa.chacun }));
-    const es = nouv.map(x => ({ id: uid(), row: null, date: auj(), mois, lib: x.lib, cat: x.cat, montant: x.montant, y: f.y, m: f.m, srv: null, pending: true, nw: true }));
-    es.forEach(e => S.journal.push(e)); memo = new Map(); if (casseSerie(f.cat)) noterDepenseDuJour();
+    const es = nouv.map(x => ({ id: uid(), row: null, date: f.date || auj(), mois, lib: x.lib, cat: x.cat, montant: x.montant, y: f.y, m: f.m, srv: null, pending: true, nw: true }));
+    es.forEach(e => S.journal.push(e)); memo = new Map(); if (casseSerie(f.cat)) noterDepenseDuJour(f.date);
     fermer(); S.y = f.y; S.m = f.m; rendre(true);
     toast(`Ta part ${e2(pa.moi)} € · on te doit ${e2(pa.chacun * pa.n)} €`, 'ANNULER', () => es.forEach(e => supprimer(e)));
     es.forEach(e => enfiler({ op: 'add', id: e.id })); return;
   }
   if (f.mode === 'add') {
     const avant = f.type === 'Dépense' ? budgetDe(f.cat, f.y, f.m) : null;
-    const e = { id: uid(), row: null, date: auj(), mois, lib, cat: f.cat, montant: n, y: f.y, m: f.m, srv: null, pending: true, nw: true };
+    const e = { id: uid(), row: null, date: f.date || auj(), mois, lib, cat: f.cat, montant: n, y: f.y, m: f.m, srv: null, pending: true, nw: true };
     const use = LS.get('usage', {}); use[f.cat] = (use[f.cat] || 0) + 1; LS.set('usage', use);
     S.journal.push(e); memo = new Map();
-    if (casseSerie(e.cat) && e.y === now.getFullYear() && e.m === now.getMonth() + 1) noterDepenseDuJour();
+    if (casseSerie(e.cat) && e.y === now.getFullYear() && e.m === now.getMonth() + 1) noterDepenseDuJour(e.date);
     const b = f.type === 'Dépense' ? budgetDe(e.cat, e.y, e.m) : null;
     if (b && b.etat === 'bad' && (!avant || avant.etat !== 'bad')) S.pop = e.cat;
     fermer(); S.y = e.y; S.m = e.m; rendre(true);
@@ -1600,7 +1615,7 @@ function enregistrer() {
     enfiler({ op: 'add', id: e.id });
   } else {
     const e = trouver(f.id) || (f.row != null && S.journal.find(x => x.row === f.row && !x.deleted)); if (!e) { fermer(); toast('Ligne introuvable, réessaie'); return; }
-    Object.assign(e, { mois, lib, cat: f.cat, montant: n, y: f.y, m: f.m, pending: true });
+    Object.assign(e, { mois, lib, cat: f.cat, montant: n, y: f.y, m: f.m, date: f.date || e.date || null, pending: true });
     fermer(); rendre(true); toast('Ligne modifiée'); enfiler({ op: 'update', id: e.id });
   }
 }
@@ -2034,11 +2049,23 @@ function avEnregistrer() {
   Object.assign(a, { lib: f.lib.trim(), montant: n, cat: f.cat, y: f.y, m: f.m, jour: f.jour, mois: moisLabel(f.y, f.m), pending: true });
   fermer(); rendre(true); toast('Achat prévu mis à jour'); enfiler({ op: 'av-save', id: a.id });
 }
+// Confirmation en un geste depuis l'accueil (montant prévu inchangé)
+function avPayerDirect(id) { const a = trouverAv(id); if (!a) return; S.form = { mode: 'av', id: a.id, lib: a.lib, montant: txtNum(a.montant), cat: a.cat, y: a.y, m: a.m, jour: a.jour || null }; avPayer(); }
+// Achats prévus dont le jour est arrivé (ou le mois passé) : à confirmer sur l'accueil
+function aConfirmer() {
+  const A = auj(); return ((S.data && S.data.avenir) || []).filter(a => !a.fait && !a.deleted && a.y && (ymNum(a.y, a.m) < nowYM() || (ymNum(a.y, a.m) === nowYM() && (a.jour ? a.y + '-' + pad2(a.m) + '-' + pad2(a.jour) <= A : false))))
+    .sort((a, b) => ymNum(a.y, a.m) - ymNum(b.y, b.m) || (a.jour || 0) - (b.jour || 0));
+}
+function blocAConfirmer() {
+  const L = aConfirmer(); if (!L.length) return '';
+  return `<div class="sec"><span>ACHATS PRÉVUS · C'EST PAYÉ ?</span><span>${L.length}</span></div>${L.map(a => `<div class="aconf"><button data-act="av" data-id="${a.id}"><b>${esc(a.lib)}</b><small>${a.jour ? 'prévu le ' + a.jour + '/' + pad2(a.m) : MOIS[a.m - 1]} · ${e2(a.montant)} € · modifier ›</small></button><button class="chip on" data-act="av-direct" data-id="${a.id}">PAYÉ ✓</button></div>`).join('')}`;
+}
 function avPayer() {
   const f = S.form, a = trouverAv(f.id), n = avValider(); if (!a || n == null) return;
   const fut = f.y * 12 + f.m > nowYM(), y = fut ? now.getFullYear() : f.y, m = fut ? now.getMonth() + 1 : f.m;
-  const e = { id: uid(), row: null, mois: moisLabel(y, m), lib: f.lib.trim(), cat: f.cat, montant: n, y, m, srv: null, pending: true, nw: true };
-  S.journal.push(e); a.fait = true; vibrer(); fermer(); S.y = y; S.m = m; rendre(true);
+  const jr = !fut && f.jour ? y + '-' + pad2(m) + '-' + pad2(Math.min(f.jour, dim(y, m))) : null;
+  const e = { id: uid(), row: null, date: jr && jr <= auj() ? jr : auj(), mois: moisLabel(y, m), lib: f.lib.trim(), cat: f.cat, montant: n, y, m, srv: null, pending: true, nw: true };
+  S.journal.push(e); a.fait = true; memo = new Map(); if (casseSerie(e.cat)) noterDepenseDuJour(e.date); vibrer(); fermer(); S.y = y; S.m = m; rendre(true);
   toast(`${e.lib} : payé, ajouté au Journal de ${MOIS[m - 1]}`);
   enfiler({ op: 'av-paye', id: a.id, jid: e.id });
 }
@@ -2214,6 +2241,9 @@ function vueProgres() {
     const own = on('defi') ? ligneDefiPerso(d, m) : '';
     if (cards.filter(Boolean).length || own) h += `<div class="sec"><span>DÉFIS</span></div>${cards.filter(Boolean).length ? `<div class="dgrid">${cards.filter(Boolean).join('')}</div>` : ''}${own}`; }
   if (ouvert('objectif')) h += `<div id="objectif"></div>` + blocObjectif();
+  // Budgets tenus (mois d'affilée depuis novembre 2026)
+  if (on('series')) { const sb = budgetsDefiables().map(c => ({ n: c.nom, s: serieBudget(c.nom) })).sort((a, b) => b.s - a.s);
+    if (sb.length) h += `<div class="sec"><span>BUDGETS TENUS</span><span>DEPUIS NOV. 2026</span></div><div class="ticket">${sb.slice(0, S.allSeries ? 99 : 4).map(x => `<div class="tl"><span>${esc(x.n.toUpperCase())}</span><span class="${x.s ? 'c-ok' : 'muted'}">${x.s ? x.s + ' MOIS TENU' + (x.s > 1 ? 'S' : '') : '—'}</span></div>`).join('')}</div>${sb.length > 4 ? `<button class="chip" style="margin-top:8px" data-act="allseries">${S.allSeries ? 'Moins ▴' : 'Tous les budgets (' + sb.length + ') ▾'}</button>` : ''}`; }
   if (on('series')) h += `<button class="note" data-act="exclus" style="display:block;width:100%;text-align:left;margin-top:12px;font-size:12px">Ne cassent pas un jour sans dépense : <b>${exclusSerie().length ? esc(exclusSerie().join(', ')) : 'aucune catégorie'}</b> · modifier ›</button>`;
   T.defis = [h, ['saison', 'semaine', 'objectif']]; }
   // PROJETS
@@ -3921,7 +3951,9 @@ document.addEventListener('click', ev => {
   if (a.startsWith('mg:y:')) { S.form.y += +a.slice(5); rendreMoisGrille(); return; }
   if (a.startsWith('mg:m:')) { S.y = S.form.y; S.m = +a.slice(5); fermer(); rendre(); return; }
   if (a.startsWith('fj:')) { const f = S.form, d = +a.slice(3); f.jour = f.jour == null ? (d > 0 ? 1 : 31) : (f.jour + d < 1 || f.jour + d > 31 ? null : f.jour + d); rendreForm(); return; }
-  if (a.startsWith('fm:')) { const f = S.form, d = +a.slice(3); let m = f.m + d, y = f.y; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } f.y = y; f.m = m; rendreForm(); return; }
+  if (a.startsWith('fm:')) { const f = S.form, d = +a.slice(3); let m = f.m + d, y = f.y; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } f.y = y; f.m = m; f.date = dateDefaut(y, m); rendreForm(); return; }
+  if (a.startsWith('fd:')) { const f = S.form, d = +a.slice(3); let x = addJ(f.date || dateDefaut(f.y, f.m) || auj(), d); const deb = f.y + '-' + pad2(f.m) + '-01', fin = f.y + '-' + pad2(f.m) + '-' + pad2(dim(f.y, f.m)), max = f.mode === 'edit' && fin > auj() ? auj() : fin; // après aujourd'hui = achat à venir (seulement pour une nouvelle ligne)
+    if (x < deb) x = deb; if (x > max) x = max; f.date = x; rendreForm(); return; }
   switch (a) {
     case 'prev': S.m--; if (S.m < 1) { S.m = 12; S.y--; } rendre(); break;
     case 'next': S.m++; if (S.m > 12) { S.m = 1; S.y++; } rendre(); break;
@@ -4030,6 +4062,7 @@ document.addEventListener('click', ev => {
     case 'avs': { const f = S.form, d = +el.dataset.d; if (el.dataset.s === 'm') { const t = f.y * 12 + f.m - 1 + d; f.y = Math.floor(t / 12); f.m = (t % 12) + 1; } else f.jour = f.jour == null ? (d > 0 ? 1 : 31) : (f.jour + d < 1 || f.jour + d > 31 ? null : f.jour + d); rendreAv(); break; }
     case 'av-save': avEnregistrer(); break;
     case 'av-paye': avPayer(); break;
+    case 'av-direct': avPayerDirect(el.dataset.id); break;
     case 'av-del': avSupprimer(); break;
     case 'mgrid': S.form = { mode: 'mois', y: S.y }; rendreForm(); ouvrirSheet(); break;
     case 'mg:today': S.y = now.getFullYear(); S.m = now.getMonth() + 1; fermer(); rendre(); break;
