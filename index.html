@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2C2C2A">
-<title>Jauge · Devlin</title>
+<title>Budget · Devlin</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-maskable-512.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Jauge">
+<meta name="apple-mobile-web-app-title" content="Budget">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&family=VT323&family=Caveat:wght@600&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
@@ -702,6 +702,13 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 .evgrid>div{display:flex;flex-direction:column;align-items:center}
 .dsrow{margin-top:2px}.dsrow span{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--ink3)}.dsrow b{color:var(--ink);font-weight:600}
 .aconf{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--rule)}.aconf>button:first-child{flex:1;min-width:0;text-align:left}.aconf b{display:block;font-size:14px}.aconf small{font-size:11.5px;color:var(--ink3)}.aconf .chip{flex:none;margin:0}
+.qi{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid currentColor;font-size:9px;font-weight:700;opacity:.65;margin-left:3px;vertical-align:1px;cursor:pointer;letter-spacing:0}
+.lblsub{display:block;font-size:9.5px;letter-spacing:.6px;opacity:.75;margin-top:2px;text-transform:none}
+.gl .glx{font-size:8px;opacity:.85;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gauge .pbg svg{max-width:none;margin:0;width:100%}
+.pbas.decouvert{border-color:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 18%,transparent);animation:decPulse 1.6s ease-in-out infinite}
+@keyframes decPulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--bad) 8%,transparent)}}@media (prefers-reduced-motion:reduce){.pbas.decouvert{animation:none}}
+.decban{background:var(--bad);color:#fff;font-family:var(--mono);font-size:10.5px;letter-spacing:1px;font-weight:600;border-radius:6px;padding:5px 8px;margin-bottom:8px;text-align:center}
 </style>
 </head>
 <body>
@@ -732,7 +739,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '7.5';
+const VERSION = '7.6';
 // Fonctionnalités masquables (Réglages). Masquer = ne plus afficher ; les données continuent d'être enregistrées.
 const FONCS = [
   ['pj', 'Montant par jour', 'sous le grand chiffre et à la saisie'],
@@ -1306,8 +1313,9 @@ function cartePointBas() {
   const ticks = idx.filter(({ p }) => p.j === 1 || p.j === 15);
   const pct = i => (X(i) / W * 100).toFixed(2) + '%';
   const points = idx.map(({ p, i }) => ({ i, p, v: (p.ev || []).reduce((t, e) => t + e.v, 0) })).filter(x => Math.abs(x.v) >= 1);
-  return `<button class="pbas" data-act="tab:prevu">
-    <div class="pbh"><span>SOLDE PRÉVU · POINT BAS</span><b class="${cls}">${e0(bas.s)}</b></div>
+  return `<button class="pbas ${bas.s < 0 ? 'decouvert' : ''}" data-act="tab:prevu">
+    ${bas.s < 0 ? `<div class="decban">⚠ DÉCOUVERT PRÉVU LE ${bas.j} ${MC[bas.m - 1].toUpperCase()} · ${e0(bas.s)}</div>` : ''}
+    <div class="pbh"><span>SOLDE PRÉVU · POINT BAS ${qi('courbe')}</span><b class="${cls}">${e0(bas.s)}</b></div>
     <div class="pbs">le ${bas.j} ${MC[bas.m - 1]}${bas.s < 0 ? ' · risque de découvert' : ''} · si tu tiens tes budgets</div>
     <div style="display:flex;gap:6px;margin-top:14px">
       <div style="position:relative;width:40px;height:${H}px;flex-shrink:0;font-size:9px;color:var(--ink3);text-align:right">${gr.map(t => `<span style="position:absolute;right:0;top:${(Y(t) / H * 100).toFixed(1)}%;transform:translateY(-50%);white-space:nowrap" class="${t < 0 ? 'c-bad' : ''}">${kEu(t)} €</span>`).join('')}</div>
@@ -1316,9 +1324,12 @@ function cartePointBas() {
           <defs><linearGradient id="pbgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${bas.s < 0 ? 'var(--bad)' : 'var(--ok)'}" stop-opacity=".24"/><stop offset="1" stop-color="${bas.s < 0 ? 'var(--bad)' : 'var(--ok)'}" stop-opacity="0"/></linearGradient></defs>
           ${gr.map(t => `<line x1="0" x2="${W}" y1="${Y(t)}" y2="${Y(t)}" stroke="${t === 0 && mn < 0 ? 'var(--bad)' : 'var(--rule)'}" stroke-opacity="${t === 0 ? 1 : .4}" ${t === 0 ? 'stroke-dasharray="4 3"' : ''} stroke-width="1" vector-effect="non-scaling-stroke"/>`).join('')}
           ${ticks.map(({ p, i }) => `<line x1="${X(i)}" x2="${X(i)}" y1="0" y2="${H - PB}" stroke="var(--rule)" stroke-opacity="${p.j === 1 ? .8 : .3}" stroke-width="1" ${p.j === 1 ? '' : 'stroke-dasharray="2 3"'} vector-effect="non-scaling-stroke"/>`).join('')}
+          ${mn < 0 ? `<clipPath id="pbneg"><rect x="0" y="${Y(0)}" width="${W}" height="${H}"/></clipPath><rect x="0" y="${Y(0)}" width="${W}" height="${H - PB - Y(0)}" fill="var(--bad)" opacity=".12"/>` : ''}
           <path d="${aire}" fill="url(#pbgrad)"/>
+          ${mn < 0 ? `<path d="${aire}" fill="var(--bad)" opacity=".35" clip-path="url(#pbneg)"/>` : ''}
           <path d="${chemin(idx.slice(0, it + 1))}" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
           <path d="${chemin(idx.slice(it))}" fill="none" stroke="var(--ink2)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+          ${mn < 0 ? `<path d="${chemin(idx)}" fill="none" stroke="var(--bad)" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#pbneg)"/>` : ''}
           <line x1="${X(it)}" x2="${X(it)}" y1="0" y2="${H - PB}" stroke="var(--acc,var(--ok))" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
         </svg>
         ${points.map(x => `<span class="pbpt" style="left:${pct(x.i)};top:${(Y(x.p.s) / H * 100).toFixed(1)}%;background:${x.v > 0 ? 'var(--ok)' : 'var(--bad)'}"></span>`).join('')}
@@ -1333,6 +1344,14 @@ function alerteVersion() {
   if (IN_GAS || !S.data || parseFloat(S.data.apiVersion) >= parseFloat(API_ATTENDUE)) return '';
   return `<div class="alert" style="cursor:default">⚠ Ton Apps Script n'est pas à jour : certaines modifications ne seront pas enregistrées.<ul style="list-style:none;padding:0"><li>Dans Apps Script, recolle le dernier Code.gs, puis Déployer › Gérer les déploiements › crayon › Nouvelle version › Déployer.</li></ul></div>`;
 }
+const INFOS = {
+  restant: ['ARGENT RESTANT', "Tes revenus du mois, moins <b>toutes</b> les charges et abonnements de l'échéancier du mois (même ceux pas encore prélevés), moins tes dépenses saisies, ton épargne et ce que tu as avancé pour d'autres. C'est ce qu'il te reste pour finir le mois. Touche le chiffre pour voir à la place ton solde en banque estimé."],
+  fin: ['FIN DE MOIS', "Ce qu'il te restera le dernier jour <b>si tu dépenses exactement tes budgets</b>, pas plus, et en comptant tes achats prévus. Si tu dépenses moins que tes budgets, tu finiras plus haut ; si tu les dépasses, plus bas."],
+  prelever: ['À PRÉLEVER', "Les charges et abonnements de l'échéancier qui ne sont pas encore passés ce mois-ci, plus tes achats prévus. C'est l'argent déjà « réservé »."],
+  nd: ['NON DÉPENSÉ', "Depuis janvier : revenus − dépenses. Comprend l'argent resté sur ton compte et celui parti en épargne."],
+  courbe: ['SOLDE PRÉVU', "Ton solde en banque jour par jour. Trait plein : estimé jusqu'à aujourd'hui. Pointillés : la suite, si tu dépenses tes budgets au rythme prévu. Points verts : entrées de l'échéancier (salaire…). Points rouges : sorties (loyer, abonnements, virements…) et achats prévus. Une dépense saisie dans ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue) ; un dépassement de budget la fait descendre. Sous 0 € : découvert."] };
+const qi = k => `<span class="qi" data-act="info" data-k="${k}" role="button" aria-label="Explication">?</span>`;
+function rendreInfo() { const [t, x] = INFOS[S.form.k] || ['', '']; $('#sheetIn').innerHTML = enteteSheet(t, null) + `<p style="font-size:14px;line-height:1.55;margin:12px 0 6px">${x}</p><button class="go" data-act="close">COMPRIS</button>`; }
 function lignePJ() {
   const p = parJour(); if (p.marge <= 0) return '';
   const fin = dim(S.y, S.m);
@@ -1346,13 +1365,13 @@ function vueAccueil() {
   if (b.st === 'cours') h += banniereEv();
   h += `<div class="gauge">${b.st === 'cours' ? blocMascotte() + blocVitrine() : ''}<button data-act="jmode" style="display:block;width:100%" aria-label="Basculer argent restant / solde">${jaugeSVG(b)}
     <div class="big ${val != null && val < 0 ? 'c-bad' : ''}" id="big" data-v="${val == null ? 0 : val}">${val == null ? '—' : e0(val)}</div>
-    <div class="lbl">${solde ? (sc == null ? 'SOLDE PAS ENCORE NOTÉ · ⚙ › MON SOLDE' : 'SOLDE EN BANQUE ESTIMÉ' + (b.st === 'cours' ? " AUJOURD'HUI" : '')) : 'ARGENT RESTANT'} <span style="opacity:.6">⇄</span></div></button>
+    <div class="lbl">${solde ? (sc == null ? 'SOLDE PAS ENCORE NOTÉ · ⚙ › MON SOLDE' : 'SOLDE EN BANQUE ESTIMÉ' + (b.st === 'cours' ? " AUJOURD'HUI" : '')) : 'ARGENT RESTANT'} <span style="opacity:.6">⇄</span>${solde ? '' : ' ' + qi('restant')}${solde ? '' : '<small class="lblsub">après les charges et dépenses du mois</small>'}</div></button>
     ${b.st === 'cours' && !solde && on('pj') ? lignePJ() : ''}
     <p class="phrase">${phraseRythme(b)}</p>`;
   const pills = [];
-  if (b.st !== 'passe') pills.push(`<button class="pill ${b.fin < 0 ? 'p-bad' : 'p-ok'}" data-act="tab:prevu"><small>FIN DE MOIS</small><b>${sg0(b.fin)}</b></button>`);
-  const ap = aPrelever(S.y, S.m); if (ap != null) pills.push(`<button class="pill" data-act="tab:prevu"><small>À PRÉLEVER</small><b>${e0(ap)}</b></button>`);
-  const nd = nonDepense(S.y); if (nd != null) pills.push(`<button class="pill ${nd < 0 ? 'p-bad' : ''}" data-act="stats-an"><small>NON DÉPENSÉ ${S.y}</small><b>${sg0(nd)}</b></button>`);
+  if (b.st !== 'passe') pills.push(`<button class="pill ${b.fin < 0 ? 'p-bad' : 'p-ok'}" data-act="tab:prevu"><small>FIN DE MOIS ${qi('fin')}</small><b>${sg0(b.fin)}</b></button>`);
+  const ap = aPrelever(S.y, S.m); if (ap != null) pills.push(`<button class="pill" data-act="tab:prevu"><small>À PRÉLEVER ${qi('prelever')}</small><b>${e0(ap)}</b></button>`);
+  const nd = nonDepense(S.y); if (nd != null) pills.push(`<button class="pill ${nd < 0 ? 'p-bad' : ''}" data-act="stats-an"><small>NON DÉPENSÉ ${S.y} ${qi('nd')}</small><b>${sg0(nd)}</b></button>`);
   if (pills.length) h += `<div class="pills" style="grid-template-columns:repeat(${pills.length},1fr)">${pills.join('')}</div>`;
   if (b.st === 'cours' && on('pointbas')) h += cartePointBas();
   h += `</div>`;
@@ -1387,7 +1406,7 @@ function vueAccueil() {
     const pr = prochains(5);
     if (pr.length) {
       h += `<div class="sec"><span>À VENIR</span></div>`;
-      pr.forEach(o => { const plus = o.type === 'Revenu' || o.type === 'Retrait'; h += `<button class="up" data-act="${o.av ? 'av' : 'tab:prevu'}" data-id="${o.id}"><span>${String(o.jour).padStart(2, '0')}/${String(o.m).padStart(2, '0')}</span><span>${esc(o.lib.toUpperCase())}${o.av ? ' <span class="stamp s-warn">PRÉVU</span>' : ''}</span><span class="${plus ? 'c-ok' : ''}">${plus ? '+' : ''}${e2(o.v)}</span></button>`; });
+      pr.forEach(o => { const plus = o.type === 'Revenu' || o.type === 'Retrait'; h += `<button class="up" data-act="${o.av ? 'av' : 'tab:prevu'}" data-id="${o.id}"><span>${String(o.jour).padStart(2, '0')}/${String(o.m).padStart(2, '0')}</span><span>${esc(o.lib.toUpperCase())}${o.av ? ' <span class="stamp s-warn">PRÉVU</span>' : ''}</span><span class="${plus ? 'c-ok' : ''}">${plus ? '+' : '−'}${e2(o.v)}</span></button>`; });
     }
   }
   return h;
@@ -1410,7 +1429,7 @@ function lignesMois() {
 }
 function montantLigne(t, v) {
   const plus = t === 'Revenu' || t === 'Retrait';
-  return `<div class="a ${plus && v > 0 ? 'c-ok' : ''}">${plus ? (v < 0 ? '−' + e2(-v) : '+' + e2(v)) : (v < 0 ? '+' + e2(-v) : e2(v))}</div>`;
+  return `<div class="a ${plus && v > 0 ? 'c-ok' : ''}">${plus ? (v < 0 ? '−' + e2(-v) : '+' + e2(v)) : (v < 0 ? '+' + e2(-v) : '−' + e2(v))}</div>`;
 }
 function htmlListe() {
   const l = lignesMois();
@@ -1486,7 +1505,7 @@ function fermer() { $('#veil').classList.remove('on'); $('#sheet').classList.rem
 function montantNum() { const n = parseFloat(String(S.form.montant).replace(',', '.')); return isFinite(n) ? n : 0; }
 function rendreForm() {
   const f = S.form; if (!f) return;
-  const R = { videotheque: rendreVideotheque, vitrine: rendreVitrine, xplog: rendreXpLog, xpinfo: rendreXpInfo, tuto: rendreTuto, exclus: rendreExclus, soon: rendreSoon, objedit: rendreObjEdit, resume: rendreResume, esccfg: rendreEscCfg, tiredit: rendreTirEdit, voyedit: rendreVoyEdit, bilmois: rendreBilMois, wrapped: rendreWrapped, remb: rendreRemb, defi: rendreDefi, lien: rendreLien, reglages: rendreReglages, budgets: rendreBudgets, cats: rendreCats, catedit: rendreCatEdit, solde: rendreSolde, ech: rendreEch, av: rendreAv, mois: rendreMoisGrille, fiche: rendreFiche }[f.mode];
+  const R = { info: rendreInfo, videotheque: rendreVideotheque, vitrine: rendreVitrine, xplog: rendreXpLog, xpinfo: rendreXpInfo, tuto: rendreTuto, exclus: rendreExclus, soon: rendreSoon, objedit: rendreObjEdit, resume: rendreResume, esccfg: rendreEscCfg, tiredit: rendreTirEdit, voyedit: rendreVoyEdit, bilmois: rendreBilMois, wrapped: rendreWrapped, remb: rendreRemb, defi: rendreDefi, lien: rendreLien, reglages: rendreReglages, budgets: rendreBudgets, cats: rendreCats, catedit: rendreCatEdit, solde: rendreSolde, ech: rendreEch, av: rendreAv, mois: rendreMoisGrille, fiche: rendreFiche }[f.mode];
   if (R) return R();
   const fav = favoris(f.type), pins = LS.get('pins', []), moisFutur = statut(f.y, f.m) === 'futur', futur = estPrevu(f);
   if (f.cat && !fav.includes(f.cat) && typeDe(f.cat) === f.type) fav.unshift(f.cat);
@@ -1678,7 +1697,7 @@ function prevuTout() {
   const actifs = l.filter(e => !echTermine(e)), finis = l.filter(echTermine);
   const ligne = e => {
     const c = cm[e.cat], plus = c && (c.type === 'Revenu' || c.type === 'Retrait');
-    return `<button class="jl" data-act="ech" data-id="${e.id}" style="${e.pause ? 'opacity:.55' : ''}"><div class="l"><div>${esc(e.lib)} ${e.pause ? '<span class="stamp s-warn" style="margin-left:4px">PAUSE</span>' : ''}${e.pending ? ' <span class="c-mute" style="font-size:11px">· envoi…</span>' : ''}</div><div class="c">${esc(echResume(e))}</div></div><div class="a ${plus ? 'c-ok' : ''}">${plus ? '+' : ''}${e2(e.montant || 0)}</div></button>`;
+    return `<button class="jl" data-act="ech" data-id="${e.id}" style="${e.pause ? 'opacity:.55' : ''}"><div class="l"><div>${esc(e.lib)} ${e.pause ? '<span class="stamp s-warn" style="margin-left:4px">PAUSE</span>' : ''}${e.pending ? ' <span class="c-mute" style="font-size:11px">· envoi…</span>' : ''}</div><div class="c">${esc(echResume(e))}</div></div><div class="a ${plus ? 'c-ok' : ''}">${plus ? '+' : '−'}${e2(e.montant || 0)}</div></button>`;
   };
   let h = '';
   ordreG.forEach(g => {
@@ -2058,7 +2077,7 @@ function aConfirmer() {
 }
 function blocAConfirmer() {
   const L = aConfirmer(); if (!L.length) return '';
-  return `<div class="sec"><span>ACHATS PRÉVUS · C'EST PAYÉ ?</span><span>${L.length}</span></div>${L.map(a => `<div class="aconf"><button data-act="av" data-id="${a.id}"><b>${esc(a.lib)}</b><small>${a.jour ? 'prévu le ' + a.jour + '/' + pad2(a.m) : MOIS[a.m - 1]} · ${e2(a.montant)} € · modifier ›</small></button><button class="chip on" data-act="av-direct" data-id="${a.id}">PAYÉ ✓</button></div>`).join('')}`;
+  return `<div class="sec"><span>PRÉVUS · C'EST FAIT ?</span><span>${L.length}</span></div>${L.map(a => { const rv = ['Revenu', 'Retrait'].includes((catMap()[a.cat] || {}).type); return `<div class="aconf"><button data-act="av" data-id="${a.id}"><b>${esc(a.lib)}</b><small>${a.jour ? 'prévu le ' + a.jour + '/' + pad2(a.m) : MOIS[a.m - 1]} · ${rv ? '+' : '−'}${e2(a.montant)} € · modifier ›</small></button><button class="chip on" data-act="av-direct" data-id="${a.id}">${rv ? 'REÇU ✓' : 'PAYÉ ✓'}</button></div>`; }).join('')}`;
 }
 function avPayer() {
   const f = S.form, a = trouverAv(f.id), n = avValider(); if (!a || n == null) return;
@@ -2117,7 +2136,7 @@ function rendreReglages() {
     <button class="opt" data-act="refresh"><span>Actualiser depuis le fichier</span><span class="muted mono" style="font-size:12px">${S.queue.length ? S.queue.length + ' en attente' : 'à jour'}</span></button>
     ${IN_GAS ? '' : `<button class="opt" data-act="go:lien"><span>Lien de mon script</span><span class="muted mono" style="font-size:12px">modifier ›</span></button>`}
     <button class="danger ${S.form.armOut ? 'armed' : ''}" data-act="logout" style="margin-top:14px">${S.form.armOut ? 'TOUCHE ENCORE : DÉCONNEXION DE CE TÉLÉPHONE' : 'SE DÉCONNECTER / CHANGER DE COMPTE'}</button>
-    <p class="muted mono" style="font-size:11px;text-align:center;margin-top:22px">JAUGE · V${VERSION}</p>`;
+    <p class="muted mono" style="font-size:11px;text-align:center;margin-top:22px">BUDGET · V${VERSION}</p>`;
 }
 
 /* ---- catégories (avec épingles) ---- */
@@ -3215,7 +3234,7 @@ function ligneDefiPerso(d, m) {
 function blocCoupDoeil() {
   const T = [];
   if (on('series')) { const j = joursSansDepense(), rec = recordSans(), v = serieVert();
-    T.push(`<div class="gl ${j >= 2 ? 'chaud' : ''}"><b>${j}</b><small>JOUR${j > 1 ? 'S' : ''} SANS DÉPENSE</small><em>${rec > j ? 'record ' + rec : j > 0 ? 'ton record 🔥' : 'à lancer'}</em></div>`);
+    T.push(`<div class="gl ${j >= 2 ? 'chaud' : ''}"><b>${j}</b><small>JOUR${j > 1 ? 'S' : ''} SANS DÉPENSE</small><em>${rec > j ? 'record ' + rec : j > 0 ? 'ton record 🔥' : 'à lancer'}</em>${exclusSerie().length ? `<em class="glx">hors ${esc(exclusSerie().join(', ').toLowerCase())}</em>` : ''}</div>`);
     T.push(`<div class="gl ${v >= 2 ? 'chaud' : ''}"><b>${v}</b><small>MOIS DANS LE VERT</small><em>${v ? "d'affilée" : 'à lancer ce mois-ci'}</em></div>`); }
   if (ouvert('objectif')) { const o = etatObjectif(now.getFullYear());
     if (!o) T.push(`<button class="gl" data-act="obj-edit"><b>+</b><small>OBJECTIF D'ÉPARGNE</small><em>à fixer</em></button>`);
@@ -3883,7 +3902,7 @@ function oublierCompte() {
 // Écran de connexion : chacun branche SON script et SA clé. Rien n'est stocké ailleurs que sur ce téléphone.
 function verrouiller(msg) {
   const l = $('#lock'); l.hidden = false;
-  l.innerHTML = `<div class="in"><div class="mono" style="letter-spacing:6px;font-weight:600;font-size:22px">JAUGE</div>
+  l.innerHTML = `<div class="in"><div class="mono" style="letter-spacing:6px;font-weight:600;font-size:22px">BUDGET</div>
     <p class="muted" style="margin:6px 0 22px">ton budget, à l'aiguille près</p>
     ${IN_GAS ? '' : `<input class="libin" id="uin" type="url" placeholder="Lien de ton script (finit par /exec)" value="${esc(S.api || '')}" autocomplete="off" style="font-size:14px">`}
     <input class="libin" id="kin" type="password" placeholder="Ta clé" autocomplete="current-password" style="margin-top:0">
@@ -4016,6 +4035,7 @@ document.addEventListener('click', ev => {
     case 'tuto-ok': LS.set('tutoVu', true); if (S.retourSaisie) { S.form = S.retourSaisie; S.retourSaisie = null; rendreForm(); } else fermer(); break;
     case 'vit': basculerVitrine(el.dataset.id); break;
     case 'dmsg': if (el.dataset.m) toast(el.dataset.m); break;
+    case 'info': S.form = { mode: 'info', k: el.dataset.k }; rendreForm(); ouvrirSheet(); break;
     case 'amb-go': LS.set(cleCos('ambiance'), el.dataset.a); appliquerCosmetiques(); rendre(true); toast('Ambiance appliquée · change-la dans Progrès › Style'); break;
     case 'videotheque': S.form = { mode: 'videotheque' }; rendreForm(); ouvrirSheet(); break;
     case 'vitrine': S.form = { mode: 'vitrine' }; rendreForm(); ouvrirSheet(); break;
