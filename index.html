@@ -739,7 +739,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '7.6';
+const VERSION = '7.8';
 // Fonctionnalités masquables (Réglages). Masquer = ne plus afficher ; les données continuent d'être enregistrées.
 const FONCS = [
   ['pj', 'Montant par jour', 'sous le grand chiffre et à la saisie'],
@@ -759,7 +759,7 @@ const FONCS = [
 const on = k => !LS.get('off', []).includes(k);
 const progresVisible = () => on('defi') || on('series') || on('bilan') || on('jeu') || ['saison', 'semaine', 'escalier', 'tirelires', 'voyage', 'objectif', 'resume'].some(k => ouvert(k)) || FEAT.some(f => !dispo(f[0]));
 // Optionnel : lien proposé par défaut au premier lancement. Laisser vide pour la version commune.
-const API_DEFAUT = 'https://script.google.com/macros/s/AKfycbx-9H7hbBT3DNrtQrw3QMwPFXksxf-4rdEqj4SkMsZrcTx3xSCJho0UhhAU3XehyQ56/exec';
+const API_DEFAUT = 'https://script.google.com/macros/s/AKfycbz3zxSxrpS3TPo7M-QXQpEVgfNK1iK-tEW5ar6MNZE1oRk4v_4PDZt3M28YFvdNgs3zHA/exec';
 const API_ATTENDUE = '5.2'; // version minimale du script ; les versions plus récentes sont acceptées
 
 /* ================= OUTILS ================= */
@@ -825,7 +825,8 @@ function api(action, extra) {
   const body = JSON.stringify(Object.assign({ action, key: S.key }, extra || {}));
   if (IN_GAS) return new Promise((res, rej) => google.script.run.withSuccessHandler(t => res(JSON.parse(t))).withFailureHandler(rej).api(body));
   return fetch(S.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow' })
-    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+    .then(async r => { const t = await r.text(); if (!r.ok) throw new Error('HTTP ' + r.status + ' · ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120));
+      try { return JSON.parse(t); } catch (e) { throw new Error('Réponse inattendue du script (souvent : autorisation Google à redonner ou déploiement à refaire) · ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)); } });
 }
 function setSync(s) { $('#dot').className = 'dot' + (s === 'sync' ? ' sync' : s === 'off' ? ' off' : ''); }
 
@@ -892,6 +893,7 @@ async function pomper() {
       } else S.journal = S.journal.filter(x => x !== e);
     }
   } catch (err) {
+    S.lastErr = { msg: String(err && err.message || err), quand: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) };
     S.busy = false; setSync('off'); setTimeout(pomper, 8000); return;
   }
   S.queue.shift(); S.gen = (S.gen || 0) + 1;
@@ -1345,12 +1347,28 @@ function alerteVersion() {
   return `<div class="alert" style="cursor:default">⚠ Ton Apps Script n'est pas à jour : certaines modifications ne seront pas enregistrées.<ul style="list-style:none;padding:0"><li>Dans Apps Script, recolle le dernier Code.gs, puis Déployer › Gérer les déploiements › crayon › Nouvelle version › Déployer.</li></ul></div>`;
 }
 const INFOS = {
-  restant: ['ARGENT RESTANT', "Tes revenus du mois, moins <b>toutes</b> les charges et abonnements de l'échéancier du mois (même ceux pas encore prélevés), moins tes dépenses saisies, ton épargne et ce que tu as avancé pour d'autres. C'est ce qu'il te reste pour finir le mois. Touche le chiffre pour voir à la place ton solde en banque estimé."],
+  restant: ['ARGENT RESTANT', "Tes revenus du mois, moins <b>toutes</b> les charges et abonnements de l'échéancier du mois (même ceux pas encore prélevés), moins tes dépenses saisies, ton épargne et ce que tu as avancé pour d'autres. C'est ce qu'il te reste pour finir le mois. Touche le chiffre pour voir à la place ton argent disponible estimé (banque + espèces)."],
   fin: ['FIN DE MOIS', "Ce qu'il te restera le dernier jour <b>si tu dépenses exactement tes budgets</b>, pas plus, et en comptant tes achats prévus. Si tu dépenses moins que tes budgets, tu finiras plus haut ; si tu les dépasses, plus bas."],
   prelever: ['À PRÉLEVER', "Les charges et abonnements de l'échéancier qui ne sont pas encore passés ce mois-ci, plus tes achats prévus. C'est l'argent déjà « réservé »."],
   nd: ['NON DÉPENSÉ', "Depuis janvier : revenus − dépenses. Comprend l'argent resté sur ton compte et celui parti en épargne."],
   courbe: ['SOLDE PRÉVU', "Ton solde en banque jour par jour. Trait plein : estimé jusqu'à aujourd'hui. Pointillés : la suite, si tu dépenses tes budgets au rythme prévu. Points verts : entrées de l'échéancier (salaire…). Points rouges : sorties (loyer, abonnements, virements…) et achats prévus. Une dépense saisie dans ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue) ; un dépassement de budget la fait descendre. Sous 0 € : découvert."] };
 const qi = k => `<span class="qi" data-act="info" data-k="${k}" role="button" aria-label="Explication">?</span>`;
+// Détail des écritures pas encore envoyées au fichier, avec la dernière erreur
+function descOp(o) {
+  const e = trouver(o.id), a = trouverAv && trouverAv(o.id), x = trouverEch(o.id);
+  const nom = { add: 'Ajout', update: 'Modification', delete: 'Suppression', 'ech-save': 'Échéancier', 'ech-del': 'Échéancier (suppression)', 'av-save': 'Achat à venir', 'av-del': 'Achat à venir (suppression)', 'av-paye': 'Achat à venir payé', call: 'Réglage' }[o.op] || o.op;
+  const d = e ? `${e.lib} · ${e2(e.montant)} €` : a ? `${a.lib} · ${e2(a.montant)} €` : x ? `${x.lib} · ${e2(x.montant || 0)} €` : o.action || '';
+  return nom + (d ? ' · ' + d : '');
+}
+function rendreFile() {
+  const er = S.lastErr;
+  $('#sheetIn').innerHTML = enteteSheet('ENVOIS EN ATTENTE', 'reglages') + `<div class="note" style="display:block;margin-top:10px">Ces modifications sont enregistrées sur ton téléphone mais pas encore dans ton fichier Google Sheets. L'appli réessaie toute seule toutes les 8 secondes.</div>
+    <div class="ticket" style="margin-top:8px">${S.queue.map((o, i) => `<div class="tl"><span style="white-space:normal">${i + 1}. ${esc(descOp(o))}</span></div>`).join('') || '<div class="tl"><span>Rien en attente ✓</span></div>'}</div>
+    ${er ? `<div class="alert" style="margin-top:10px;cursor:default">Dernière erreur (${esc(er.quand)}) : ${esc(er.msg)}</div>` : ''}
+    <div class="note" style="display:block;margin-top:8px">Si ça bloque : ouvre le lien de ton script (/exec) dans un navigateur. Il doit afficher « script … en ligne ✓ ». Sinon, dans Apps Script, lance une fonction une fois (bouton ▶) pour redonner l'autorisation, puis Déployer › Gérer les déploiements › Nouvelle version.</div>
+    <button class="go" data-act="file-retry" style="margin-top:10px">RÉESSAYER MAINTENANT</button>
+    ${S.queue.length ? `<button class="danger ${S.form.arm ? 'armed' : ''}" data-act="file-drop">${S.form.arm ? 'TOUCHE ENCORE : ABANDONNER LE 1ER ENVOI' : 'ABANDONNER LE 1ER ENVOI (bloquant)'}</button>` : ''}`;
+}
 function rendreInfo() { const [t, x] = INFOS[S.form.k] || ['', '']; $('#sheetIn').innerHTML = enteteSheet(t, null) + `<p style="font-size:14px;line-height:1.55;margin:12px 0 6px">${x}</p><button class="go" data-act="close">COMPRIS</button>`; }
 function lignePJ() {
   const p = parJour(); if (p.marge <= 0) return '';
@@ -1365,7 +1383,7 @@ function vueAccueil() {
   if (b.st === 'cours') h += banniereEv();
   h += `<div class="gauge">${b.st === 'cours' ? blocMascotte() + blocVitrine() : ''}<button data-act="jmode" style="display:block;width:100%" aria-label="Basculer argent restant / solde">${jaugeSVG(b)}
     <div class="big ${val != null && val < 0 ? 'c-bad' : ''}" id="big" data-v="${val == null ? 0 : val}">${val == null ? '—' : e0(val)}</div>
-    <div class="lbl">${solde ? (sc == null ? 'SOLDE PAS ENCORE NOTÉ · ⚙ › MON SOLDE' : 'SOLDE EN BANQUE ESTIMÉ' + (b.st === 'cours' ? " AUJOURD'HUI" : '')) : 'ARGENT RESTANT'} <span style="opacity:.6">⇄</span>${solde ? '' : ' ' + qi('restant')}${solde ? '' : '<small class="lblsub">après les charges et dépenses du mois</small>'}</div></button>
+    <div class="lbl">${solde ? (sc == null ? 'SOLDE PAS ENCORE NOTÉ · ⚙ › MON SOLDE' : 'ARGENT DISPONIBLE ESTIMÉ' + (b.st === 'cours' ? " AUJOURD'HUI" : '') + '<small class="lblsub">banque + espèces</small>') : 'ARGENT RESTANT'} <span style="opacity:.6">⇄</span>${solde ? '' : ' ' + qi('restant')}${solde ? '' : '<small class="lblsub">après les charges et dépenses du mois</small>'}</div></button>
     ${b.st === 'cours' && !solde && on('pj') ? lignePJ() : ''}
     <p class="phrase">${phraseRythme(b)}</p>`;
   const pills = [];
@@ -1496,6 +1514,7 @@ const TUTO = [
   ['🐷', 'ÉPARGNE', "Uniquement l'argent que tu <b>mets de côté</b> : versement sur un livret, PEA, assurance vie, crypto… On ne retire jamais depuis cet onglet. C'est ce qui remplit ton objectif d'épargne. Un transfert d'un placement à un autre (livret A → PEA) ne se saisit pas : ça se passe dans ton suivi de patrimoine."],
   ['🔁', 'PRÉLÈVEMENTS RÉGULIERS', "Loyer, abonnements, salaire, virement d'épargne automatique : mets-les une fois dans l'onglet <b>Prévu</b>. Ne les saisis pas en plus ici, sinon ils comptent deux fois."],
   ['👥', "PAYÉ POUR D'AUTRES", "Dans une dépense, touche « Payé pour d'autres aussi » : ta part va dans ton budget, le reste dans « On te doit » jusqu'au remboursement."],
+  ['🏦', 'MON SOLDE (BANQUE + ESPÈCES)', "Quand tu veux, pas seulement en début de mois (⚙ › Mon solde) : tape ce qu'il y a sur ton compte <b>et</b> le liquide que tu as en poche. Un retrait au distributeur ne se saisit pas : l'argent passe juste de la banque à ta poche. Ce sont les achats payés en liquide que tu saisis, comme les autres. Si tu oublies les espèces, l'appli croira qu'il te manque de l'argent."],
   ['📅', 'DATE ET ACHAT À VENIR', "La date est celle du jour par défaut. Oublié une dépense hier ? Recule-la avec ‹. Une place d'avant-première, un achat déjà prévu ? Avance la date après aujourd'hui (ou le mois avec ›) : la ligne devient un achat à venir, que tu valideras le jour venu."]];
 function rendreTuto() {
   $('#sheetIn').innerHTML = enteteSheet('COMMENT SAISIR', null) + `<div style="margin-top:8px">${TUTO.map(t => `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--rule)"><span style="font-size:24px;flex:none;width:34px;text-align:center">${t[0]}</span><div style="flex:1;min-width:0"><div style="font-family:var(--mono);font-size:12px;letter-spacing:1.4px;font-weight:600;margin-bottom:3px">${t[1]}</div><div style="font-size:13px;line-height:1.45;color:var(--ink2)">${t[2]}</div></div></div>`).join('')}</div>
@@ -1505,7 +1524,7 @@ function fermer() { $('#veil').classList.remove('on'); $('#sheet').classList.rem
 function montantNum() { const n = parseFloat(String(S.form.montant).replace(',', '.')); return isFinite(n) ? n : 0; }
 function rendreForm() {
   const f = S.form; if (!f) return;
-  const R = { info: rendreInfo, videotheque: rendreVideotheque, vitrine: rendreVitrine, xplog: rendreXpLog, xpinfo: rendreXpInfo, tuto: rendreTuto, exclus: rendreExclus, soon: rendreSoon, objedit: rendreObjEdit, resume: rendreResume, esccfg: rendreEscCfg, tiredit: rendreTirEdit, voyedit: rendreVoyEdit, bilmois: rendreBilMois, wrapped: rendreWrapped, remb: rendreRemb, defi: rendreDefi, lien: rendreLien, reglages: rendreReglages, budgets: rendreBudgets, cats: rendreCats, catedit: rendreCatEdit, solde: rendreSolde, ech: rendreEch, av: rendreAv, mois: rendreMoisGrille, fiche: rendreFiche }[f.mode];
+  const R = { file: rendreFile, info: rendreInfo, videotheque: rendreVideotheque, vitrine: rendreVitrine, xplog: rendreXpLog, xpinfo: rendreXpInfo, tuto: rendreTuto, exclus: rendreExclus, soon: rendreSoon, objedit: rendreObjEdit, resume: rendreResume, esccfg: rendreEscCfg, tiredit: rendreTirEdit, voyedit: rendreVoyEdit, bilmois: rendreBilMois, wrapped: rendreWrapped, remb: rendreRemb, defi: rendreDefi, lien: rendreLien, reglages: rendreReglages, budgets: rendreBudgets, cats: rendreCats, catedit: rendreCatEdit, solde: rendreSolde, ech: rendreEch, av: rendreAv, mois: rendreMoisGrille, fiche: rendreFiche }[f.mode];
   if (R) return R();
   const fav = favoris(f.type), pins = LS.get('pins', []), moisFutur = statut(f.y, f.m) === 'futur', futur = estPrevu(f);
   if (f.cat && !fav.includes(f.cat) && typeDe(f.cat) === f.type) fav.unshift(f.cat);
@@ -1898,12 +1917,12 @@ function okSolde() {
 }
 function rendreSolde() {
   const f = S.form, y = now.getFullYear(), m = now.getMonth() + 1, cal = soldeCalcule(y, m), d = now.getDate(), sal = salaireDejaLa();
-  let h = enteteSheet('MON SOLDE', 'reglages') + `<div class="note" style="display:block;margin-top:10px">Une fois par mois, idéalement <b>le 1er</b> : tape ce qu'il y a sur ton compte aujourd'hui. L'appli repart de ce montant, c'est tout.</div>
+  let h = enteteSheet('MON SOLDE', 'reglages') + `<div class="note" style="display:block;margin-top:10px">Quand tu veux (idéalement le 1er) : tape ce qu'il y a sur ton compte aujourd'hui <b>et le liquide que tu as en poche</b>. L'appli repart du total, c'est tout. Un retrait d'espèces ne se saisit pas : seuls les achats payés en liquide se saisissent.</div>
     ${cal != null ? `<div class="ticket" style="margin-top:10px"><div class="tl"><span>L'APPLI CALCULE AUJOURD'HUI</span><span id="scal">${e2(cal)}</span></div></div>` : ''}
     <div class="grp" style="margin-top:14px">SUR TON COMPTE AUJOURD'HUI</div>
     <div style="display:flex;gap:8px"><button class="chip ${f.neg ? 'on' : ''}" data-act="s-neg" style="height:42px;margin-top:10px" aria-label="Solde négatif">±</button>
       <input class="libin" data-f="banque" inputmode="decimal" placeholder="Solde de ton compte en €" value="${esc(f.banque)}"></div>
-    <input class="libin" data-f="especes" inputmode="decimal" placeholder="Espèces dans ton portefeuille (facultatif)" value="${esc(f.especes)}" style="margin-top:0">
+    <input class="libin" data-f="especes" inputmode="decimal" placeholder="Espèces en poche (liquide pas encore dépensé)" value="${esc(f.especes)}" style="margin-top:0">
     ${d >= 20 && sal > 0 ? `<button class="chip ${f.salDeja ? 'on' : ''}" data-act="s-sal" style="margin-top:2px;white-space:normal;text-align:left">${f.salDeja ? '✓ ' : ''}Mon salaire du mois prochain (${e0(sal)}) est déjà sur le compte</button>` : ''}
     <div class="hint" id="secart" style="margin-top:6px"></div><div class="err" id="ferr"></div>
     <button class="go" data-act="s-ok">C'EST MON SOLDE</button>
@@ -2115,7 +2134,7 @@ function rendreReglages() {
     <div class="grp" style="margin-top:18px">MON BUDGET</div>
     <button class="opt" data-act="go:budgets"><span>Budgets par catégorie</span><span class="muted mono" style="font-size:12px">${e0(bud)}/mois ›</span></button>
     <button class="opt" data-act="go:cats"><span>Catégories et favorites</span><span class="muted mono" style="font-size:12px">${cats().length} · ${S.data.libres || 0} libre${(S.data.libres || 0) > 1 ? 's' : ''} ›</span></button>
-    <button class="opt" data-act="go:solde"><span>Mon solde (chaque début de mois)</span><span class="muted mono" style="font-size:12px">${lc ? 'dernier : ' + lc.date : 'jamais noté'} ›</span></button>
+    <button class="opt" data-act="go:solde"><span>Mon solde (quand tu veux, idéalement le 1er)</span><span class="muted mono" style="font-size:12px">${lc ? 'dernier : ' + lc.date : 'jamais noté'} ›</span></button>
     <div class="grp" style="margin-top:18px">ACCUEIL</div>
     <div class="grp" style="margin:6px 0 0;letter-spacing:1px">ORDRE DES BUDGETS SUR L'ACCUEIL</div>
     <div class="note" style="margin:2px 0 4px;display:block">${ob === 'perso' ? 'Mon ordre : celui que tu as choisi dans Réglages › Catégories (flèches ▲▼).' : 'Les plus urgents d\'abord : ceux proches de leur limite, puis ceux déjà dépassés, puis ceux bien tenus.'}</div>
@@ -2133,7 +2152,7 @@ function rendreReglages() {
     ${ACCES_ANTICIPE ? tg('anticipe', anticipe(), 'Accès anticipé', 'débloque tout de suite les nouveautés prévues pour les prochains mois') : ''}
     <div class="grp" style="margin-top:18px">DONNÉES</div>
     ${S.data.url ? `<a class="opt" href="${esc(S.data.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir mon fichier Google Sheets</span><span class="muted">↗</span></a>` : ''}
-    <button class="opt" data-act="refresh"><span>Actualiser depuis le fichier</span><span class="muted mono" style="font-size:12px">${S.queue.length ? S.queue.length + ' en attente' : 'à jour'}</span></button>
+    <button class="opt" data-act="${S.queue.length ? 'file' : 'refresh'}"><span>${S.queue.length ? 'Envois en attente' : 'Actualiser depuis le fichier'}</span><span class="${S.queue.length ? 'c-bad' : 'muted'} mono" style="font-size:12px">${S.queue.length ? S.queue.length + ' en attente · voir ›' : 'à jour'}</span></button>
     ${IN_GAS ? '' : `<button class="opt" data-act="go:lien"><span>Lien de mon script</span><span class="muted mono" style="font-size:12px">modifier ›</span></button>`}
     <button class="danger ${S.form.armOut ? 'armed' : ''}" data-act="logout" style="margin-top:14px">${S.form.armOut ? 'TOUCHE ENCORE : DÉCONNEXION DE CE TÉLÉPHONE' : 'SE DÉCONNECTER / CHANGER DE COMPTE'}</button>
     <p class="muted mono" style="font-size:11px;text-align:center;margin-top:22px">BUDGET · V${VERSION}</p>`;
@@ -4136,6 +4155,9 @@ document.addEventListener('click', ev => {
     case 'dep-ok': okDepart(); break;
     case 'theme': LS.set('theme', el.dataset.t); appliquerTheme(); rendreReglages(); break;
     case 'refresh': fermer(); rafraichir(true); toast('Actualisation…'); break;
+    case 'file': S.form = { mode: 'file', arm: false }; rendreForm(); ouvrirSheet(); break;
+    case 'file-retry': if (!S.busy) pomper(); toast('Nouvel essai…'); setTimeout(() => { if (S.form && S.form.mode === 'file') rendreFile(); }, 4000); break;
+    case 'file-drop': if (!S.form.arm) { S.form.arm = true; rendreFile(); break; } { const o = S.queue.shift(); const e = o && trouver(o.id); if (e) e.pending = false; sauver(); S.form.arm = false; rendreFile(); rendre(true); toast('Envoi abandonné : à ressaisir si besoin'); } break;
     case 'logout': if (!S.form.armOut) { S.form.armOut = true; rendreReglages(); } else { fermer(); oublierCompte(); rendre(); verrouiller(); } break;
     case 'go:lien': S.form = { mode: 'lien', url: S.api }; rendreForm(); break;
     case 'lien-ok': okLien(); break;
