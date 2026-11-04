@@ -698,7 +698,18 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 .vidban{display:block;width:100%;text-align:left;border:1.5px solid var(--rule);border-radius:12px;padding:10px 12px;margin-top:12px;background:linear-gradient(135deg,#141210,#2A2420);color:#F1EFE8}
 .vidh{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:11px;letter-spacing:1.2px}.vidh span{color:#C9C6BC;font-size:10px;letter-spacing:.4px}
 .vidrow{display:flex;gap:10px;margin-top:10px;justify-content:space-between}
-.vidgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px;margin-top:12px}.vidgrid>div{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px}.vidgrid small{font-size:10.5px;line-height:1.2}.vidgrid em{font-style:normal;font-family:var(--mono);font-size:8.5px;color:var(--ink3);letter-spacing:.6px}
+.pinchip{display:inline-block;white-space:nowrap;margin-left:6px;font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.5px;padding:2px 7px;border-radius:99px;border:1px solid var(--rule);color:var(--ink2);vertical-align:1px}
+.vidtop{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--ink3)}
+.vidgrid>button{position:relative}.pinmk{position:absolute;top:-4px;right:6px;font-style:normal;font-size:13px}
+#plein{position:fixed;inset:0;z-index:60;background:rgba(8,8,10,.88);display:none;align-items:center;justify-content:center;padding:20px 16px;overflow:auto}
+#plein.on{display:flex;animation:plin .2s ease-out}@keyframes plin{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+.plbox{position:relative;max-width:360px;width:100%;text-align:center;color:#F2F0E8}.plaf{display:flex;justify-content:center}.plaf svg{filter:drop-shadow(0 12px 30px rgba(0,0,0,.6))}
+.plbox h3{margin:14px 0 6px;font-size:20px}.plbox p{margin:10px 0 4px;font-size:14px;line-height:1.4;color:#D8D6CE}
+.plmeta{font-family:var(--mono);font-size:10px;letter-spacing:1px;color:#A9A79F}.plinfo{font-size:12px;color:#C9C7BF}
+.plx{position:absolute;top:-6px;right:0;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);color:#fff;font-size:16px}
+.plpin{font-family:var(--mono);font-size:11px;letter-spacing:.6px;padding:7px 12px;border-radius:99px;border:1px solid rgba(255,255,255,.35);color:#fff;background:transparent}
+.plpin.on{background:#2E7D4F;border-color:#2E7D4F}
+.vidgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px;margin-top:12px}.vidgrid>div,.vidgrid>button{display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;background:none;border:0;padding:0;color:inherit}.vidgrid small{font-size:10.5px;line-height:1.2}.vidgrid em{font-style:normal;font-family:var(--mono);font-size:8.5px;color:var(--ink3);letter-spacing:.6px}
 .evgrid>div{display:flex;flex-direction:column;align-items:center}
 .dsrow{margin-top:2px}.dsrow span{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--ink3)}.dsrow b{color:var(--ink);font-weight:600}
 .aconf{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--rule)}.aconf>button:first-child{flex:1;min-width:0;text-align:left}.aconf b{display:block;font-size:14px}.aconf small{font-size:11.5px;color:var(--ink3)}.aconf .chip{flex:none;margin:0}
@@ -743,7 +754,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '8.3';
+const VERSION = '8.6';
 // Fonctionnalités masquables (Réglages). Masquer = ne plus afficher ; les données continuent d'être enregistrées.
 const FONCS = [
   ['pj', 'Montant par jour', 'sous le grand chiffre et à la saisie'],
@@ -763,7 +774,7 @@ const FONCS = [
 const on = k => !LS.get('off', []).includes(k);
 const progresVisible = () => on('defi') || on('series') || on('bilan') || on('jeu') || ['saison', 'semaine', 'escalier', 'tirelires', 'voyage', 'objectif', 'resume'].some(k => ouvert(k)) || FEAT.some(f => !dispo(f[0]));
 // Optionnel : lien proposé par défaut au premier lancement. Laisser vide pour la version commune.
-const API_DEFAUT = 'https://script.google.com/macros/s/AKfycbxdGhH25wz6SwDCV5a1q2lkeIXSrv8JC_06vfsWd6jzVCRabbgFFIkHoctg9pvDLCV3Ww/exec';
+const API_DEFAUT = 'https://script.google.com/macros/s/AKfycbyq1DoL_nP5dOMlHvWdxubnv2gW63MWgHeZ3wo_ZYZuXotnNHjrIjnXrTmSt5BQYAv90Q/exec';
 const API_ATTENDUE = '5.2'; // version minimale du script ; les versions plus récentes sont acceptées
 
 /* ================= OUTILS ================= */
@@ -898,6 +909,9 @@ async function pomper() {
     }
   } catch (err) {
     S.lastErr = { msg: String(err && err.message || err), quand: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) };
+    // Un élément « à venir » qui échoue ne bloque plus les autres envois : il passe en fin de file.
+    op.essais = (op.essais || 0) + 1;
+    if (op.op.startsWith('av-') && op.essais >= 2 && S.queue.some(o => !o.op.startsWith('av-'))) { S.queue.push(S.queue.shift()); sauver(); S.busy = false; setTimeout(pomper, 300); return; }
     S.busy = false; setSync('off'); setTimeout(pomper, 8000); return;
   }
   S.queue.shift(); S.gen = (S.gen || 0) + 1;
@@ -976,7 +990,7 @@ function projAnnee(y) { let t = 0; for (let k = 1; k <= 12; k++) { const b = bil
 function aPrelever(y, m) {
   const st = statut(y, m); if (st === 'passe') return null;
   const d = now.getDate(); let t = 0;
-  occurrences(y, m).forEach(o => { if (o.type !== 'Revenu' && o.type !== 'Retrait' && (st === 'futur' || o.jour >= d)) t += o.v; });
+  occurrences(y, m).forEach(o => { if (o.type !== 'Revenu' && o.type !== 'Retrait' && (st === 'futur' || o.jour > d)) t += o.v; }); // dès le matin du jour J, le prélèvement est compté comme passé
   avenirMois(y, m).forEach(a => { const c = catMap()[a.cat]; if (c && c.type !== 'Revenu' && c.type !== 'Retrait') t += a.montant; });
   return t;
 }
@@ -1157,7 +1171,7 @@ function prochains(n) {
   const y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate(), cm = catMap(); let l = [];
   for (let k = 0; k < 2; k++) {
     const yy = m + k > 12 ? y + 1 : y, mm = ((m + k - 1) % 12) + 1;
-    l = l.concat(occurrences(yy, mm).filter(o => k > 0 || o.jour >= d));
+    l = l.concat(occurrences(yy, mm).filter(o => k > 0 || o.jour > d));
     l = l.concat(avenirMois(yy, mm).filter(a => a.jour && (k > 0 || a.jour >= d)).map(a => ({ id: a.id, av: true, lib: a.lib, cat: a.cat, type: cm[a.cat] ? cm[a.cat].type : 'Dépense', v: a.montant, jour: a.jour, y: yy, m: mm })));
   }
   return l.sort((a, b) => (a.y * 12 + a.m) - (b.y * 12 + b.m) || a.jour - b.jour).slice(0, n);
@@ -1554,7 +1568,7 @@ function rendreForm() {
   }
   const sug = f.cat ? suggestions(f.cat) : [];
   $('#sheetIn').innerHTML = `<div class="grab"></div>
-    <div class="shead"><span>${f.mode === 'edit' ? 'MODIFIER LA LIGNE' : futur ? 'ACHAT PRÉVU' : 'NOUVELLE LIGNE'} <button class="lnk" data-act="tuto" style="margin-left:6px">? AIDE</button></span><button class="ibtn" data-act="close" aria-label="Fermer">${ico.x}</button></div>
+    <div class="shead"><span>${f.mode === 'edit' ? 'MODIFIER LA LIGNE' : futur ? (f.type === 'Revenu' ? 'REVENU PRÉVU' : f.type === 'Épargne' ? 'ÉPARGNE PRÉVUE' : 'ACHAT PRÉVU') : 'NOUVELLE LIGNE'} <button class="lnk" data-act="tuto" style="margin-left:6px">? AIDE</button></span><button class="ibtn" data-act="close" aria-label="Fermer">${ico.x}</button></div>
     <div class="seg">${Object.keys(TYPES).map(t => `<button class="${f.type === t ? 'on' : ''}" data-act="type" data-t="${t}">${t.toUpperCase()}</button>`).join('')}</div>
     <div class="amt ${montantNum() ? '' : 'zero'}" id="amt">${f.montant ? esc(f.montant) : '0'} €</div>
     <div class="mrow"><button class="mbtn" data-act="fm:-1" aria-label="Mois précédent">‹</button><span>${moisLabel(f.y, f.m).toUpperCase()}</span><button class="mbtn" data-act="fm:1" aria-label="Mois suivant">›</button></div>
@@ -1597,7 +1611,7 @@ function majHint() {
   const f = S.form, h = $('#hint'), a = $('#amt'); if (!f || !h) return;
   a.textContent = (f.montant || '0') + ' €'; a.classList.toggle('zero', !montantNum());
   $('#ferr').textContent = '';
-  if (estPrevu(f) && f.mode === 'add') { h.innerHTML = '<span class="muted">Rangé dans tes achats à venir : tu le valideras le jour venu (onglet Journal ou accueil)</span>'; return; }
+  if (estPrevu(f) && f.mode === 'add') { h.innerHTML = '<span class="muted">Rangé dans « À venir » : tu le valideras le jour venu, sur l\'accueil</span>'; return; }
   if (!f.cat) { h.innerHTML = '<span class="muted">Choisis une catégorie</span>'; return; }
   const pa = partage(), z = $('#presume');
   if (z) z.innerHTML = !f.noms || !f.noms.length ? 'Choisis qui te doit' : montantNum() ? `Ta part : <b>${e2(pa.moi)} €</b> dans ton budget · ${pa.n > 1 ? 'chacun te doit' : esc(f.noms[0]) + ' te doit'} <b>${e2(pa.chacun)} €</b>${pa.auto ? ' (parts égales)' : ''}` : 'Tape le montant total payé';
@@ -1716,7 +1730,7 @@ function echResume(e) {
 function prochainPassage(e) {
   for (let k = 0; k < 36; k++) {
     const t = nowYM() + k, y = Math.floor((t - 1) / 12), m = ((t - 1) % 12) + 1;
-    if (echMontant(Object.assign({}, e, { pause: false }), y, m) && (k > 0 || (e.jour || 1) >= now.getDate())) return `${e.jour || 1} ${MC[m - 1]} ${y}`;
+    if (echMontant(Object.assign({}, e, { pause: false }), y, m) && (k > 0 || (e.jour || 1) > now.getDate())) return `${e.jour || 1} ${MC[m - 1]} ${y}`;
   }
   return null;
 }
@@ -1968,7 +1982,7 @@ function prevuMois() {
   let h = `<div class="ticket" style="margin-top:10px"><div class="tl"><span>ENTRÉES PRÉVUES</span><span class="c-ok">+${e2(rev)}</span></div><div class="tl"><span>SORTIES PRÉVUES</span><span>${neg2(dep)}</span></div></div>`;
   h += `<div class="sec"><span>${esc(moisLabel(S.y, S.m).toUpperCase())}</span><span>${l.length} LIGNES</span></div>`;
   l.forEach(o => {
-    const passe = o.k === 'e' && (st === 'passe' || (st === 'cours' && o.jour < d)), plus = o.type === 'Revenu' || o.type === 'Retrait';
+    const passe = o.k === 'e' && (st === 'passe' || (st === 'cours' && o.jour <= d)), plus = o.type === 'Revenu' || o.type === 'Retrait';
     h += `<button class="jl" data-act="${o.k === 'a' ? 'av' : 'ech'}" data-id="${o.id}" data-ctx="1" style="${passe ? 'opacity:.55' : ''}"><div class="l"><div>${esc(o.lib)}${o.k === 'a' ? ' <span class="stamp s-warn">PRÉVU</span>' : ''}</div><div class="c">${o.jour < 32 ? 'le ' + o.jour + ' · ' : ''}${esc(o.cat)}${passe ? ' · passé ✓' : ''}</div></div><div class="a ${plus ? 'c-ok' : ''}">${plus ? '+' : '−'}${e2(o.v)}</div></button>`;
   });
   return h;
@@ -2079,18 +2093,19 @@ function rendreAv() {
   const f = S.form, cours = nowYM(), cible = f.y * 12 + f.m;
   const payeMois = cible > cours ? moisLabel(now.getFullYear(), now.getMonth() + 1) : moisLabel(f.y, f.m);
   let tout = '';
-  if (f.all) GROUPES.forEach(g => { const l = cats().filter(c => c.groupe === g && c.type === 'Dépense'); if (!l.length) return; tout += `<div class="grp">${esc(g.toUpperCase())}</div><div class="chips">` + l.map(c => `<button class="chip ${f.cat === c.nom ? 'on' : ''}" data-act="av-cat" data-cat="${esc(c.nom)}">${esc(c.nom)}</button>`).join('') + '</div>'; });
-  $('#sheetIn').innerHTML = enteteSheet('ACHAT PRÉVU') + `
+  const rv = ['Revenu', 'Retrait'].includes((catMap()[f.cat] || {}).type), tp = rv ? ['Revenu'] : (catMap()[f.cat] || {}).type === 'Épargne' ? ['Épargne'] : ['Dépense'];
+  if (f.all) GROUPES.forEach(g => { const l = cats().filter(c => c.groupe === g && tp.includes(c.type)); if (!l.length) return; tout += `<div class="grp">${esc(g.toUpperCase())}</div><div class="chips">` + l.map(c => `<button class="chip ${f.cat === c.nom ? 'on' : ''}" data-act="av-cat" data-cat="${esc(c.nom)}">${esc(c.nom)}</button>`).join('') + '</div>'; });
+  $('#sheetIn').innerHTML = enteteSheet(rv ? 'REVENU PRÉVU' : 'ACHAT PRÉVU') + `
     <input class="libin" data-f="lib" value="${esc(f.lib)}" maxlength="80" style="margin-top:14px">
     <input class="libin" data-f="montant" inputmode="decimal" placeholder="Montant en €" value="${esc(f.montant)}" style="margin-top:0">
     <div class="chips"><button class="chip on" data-act="av-allcat">${esc(f.cat)} ▾</button></div>${tout}
     <div class="stp"><span>MOIS</span><span class="v"><button data-act="avs" data-s="m" data-d="-1">‹</button><span>${MC[f.m - 1]} ${f.y}</span><button data-act="avs" data-s="m" data-d="1">›</button></span></div>
     <div class="stp"><span>JOUR</span><span class="v"><button data-act="avs" data-s="j" data-d="-1">‹</button><span>${f.jour ? 'le ' + f.jour : 'non précisé'}</span><button data-act="avs" data-s="j" data-d="1">›</button></span></div>
     <div class="err" id="ferr" style="margin-top:10px"></div>
-    <button class="go" data-act="av-paye">C'EST PAYÉ · ${esc(payeMois.toUpperCase())}</button>
+    <button class="go" data-act="av-paye">${rv ? "C'EST REÇU" : "C'EST PAYÉ"} · ${esc(payeMois.toUpperCase())}</button>
     <div class="note" style="margin-top:6px">Le montant ci-dessus part dans le Journal : ajuste-le si le prix a changé.</div>
     <button class="ghost" data-act="av-save">ENREGISTRER LES CHANGEMENTS</button>
-    <button class="danger ${f.arm ? 'armed' : ''}" data-act="av-del">${f.arm ? 'TOUCHE ENCORE POUR SUPPRIMER' : "J'ANNULE CET ACHAT"}</button>`;
+    <button class="danger ${f.arm ? 'armed' : ''}" data-act="av-del">${f.arm ? 'TOUCHE ENCORE POUR SUPPRIMER' : (rv ? "CE REVENU N'ARRIVERA PAS" : "J'ANNULE CET ACHAT")}</button>`;
   lierChamps();
 }
 function avValider() {
@@ -2305,7 +2320,7 @@ function vueProgres() {
   // PROJETS
   { let h = ''; T.projets = [h, ['objectif', 'tirelires', 'voyage']]; }
   // SUCCÈS et STYLE
-  T.succes = [ej ? blocNiveau(ej) + `<button class="note" data-act="vitrine" style="display:block;width:100%;text-align:left">📌 Choisis jusqu'à 3 badges à afficher à côté de ta jauge (ou aucun) ›</button>` + blocVideotheque(ej) + blocSucces(ej) + blocBadgesEv(ej) : '', []];
+  T.succes = [ej ? blocNiveau(ej) + blocVideotheque(ej) + blocSucces(ej) + blocBadgesEv(ej) : '', []];
   T.style = [ej ? blocCollection(ej) : '', ['cosmetiques']];
   const NOMS = [['bilans', 'BILANS'], ['defis', 'DÉFIS'], ['succes', 'SUCCÈS'], ['style', 'STYLE']];
   const vis = NOMS.filter(([k]) => T[k][0] || T[k][1].some(f => !dispo(f)));
@@ -3083,12 +3098,28 @@ function basculerVitrine(id) {
 const epingle = id => (vitrine() || []).includes(id);
 function rendreVideotheque() {
   const e = etatJeu(), L = e.succes.slice().sort((a, b) => (b.ok - a.ok) || (DN[a.d] - DN[b.d]));
-  $('#sheetIn').innerHTML = enteteSheet('TA VIDÉOTHÈQUE · ' + e.succes.filter(s => s.ok).length + '/' + e.succes.length, null) + `<div class="note" style="display:block;margin-top:8px">Chaque succès débloque l'affiche d'un film de la saga ORBITE. Plus il est difficile, plus le format est beau : 35 mm, Grand écran, Laser, 70 mm.</div>
-    <div class="vidgrid">${L.map(s => `<div>${affiche(s.id, DN[s.d], 72, !s.ok)}<small>${esc(s.nom)}</small><em>${s.ok ? CADRES.a[DN[s.d]] : s.cur + '/' + s.max}</em></div>`).join('')}</div>`;
+  $('#sheetIn').innerHTML = enteteSheet('TA VIDÉOTHÈQUE · ' + e.succes.filter(s => s.ok).length + '/' + e.succes.length, null) + `<div class="vidtop"><span>Touche une affiche pour la voir en grand</span><button class="pinchip" data-act="vitrine">📌 ${(vitrine() || []).length}/3 au profil</button></div>
+    <div class="vidgrid">${L.map(s => `<button data-act="plein" data-id="${s.id}">${affiche(s.id, DN[s.d], 72, !s.ok)}${s.ok && epingle('s:' + s.id) ? '<i class="pinmk">📌</i>' : ''}<small>${esc(s.nom)}</small><em>${s.ok ? CADRES.a[DN[s.d]] : s.cur + '/' + s.max}</em></button>`).join('')}</div>`;
 }
+// Affiche en plein écran : titre, comment l'obtenir, et l'épingler au profil
+function ouvrirPlein(id) {
+  const e = etatJeu(), s = e.succes.find(x => x.id === id); if (!s) return;
+  let o = $('#plein'); if (!o) { o = document.createElement('div'); o.id = 'plein'; document.body.appendChild(o); }
+  const ep = epingle('s:' + s.id), n = (vitrine() || []).length, fmt = CADRES.a[DN[s.d]];
+  o.innerHTML = `<div class="plbox"><button class="plx" data-act="plein-x" aria-label="Fermer">✕</button>
+    <div class="plaf">${affiche(s.id, DN[s.d], Math.min(300, Math.round(innerWidth * .72)), !s.ok)}</div>
+    <h3>${esc(s.nom)}</h3>
+    ${s.ok ? `<button class="plpin ${ep ? 'on' : ''}" data-act="plein-pin" data-id="${s.id}">${ep ? '📌 ÉPINGLÉE AU PROFIL · RETIRER' : n >= 3 ? '📌 PROFIL COMPLET (3/3) · TOUCHE POUR GÉRER' : '📌 ÉPINGLER AU PROFIL (' + n + '/3)'}</button>`
+      : `<div class="plinfo">🔒 À débloquer · une fois gagnée, tu pourras l'épingler au profil</div>`}
+    <p>${esc(s.txt)}</p>
+    <div class="plmeta">${s.ok ? 'FORMAT ' + fmt + ' · DÉBLOQUÉE' : 'PROGRESSION ' + s.cur + '/' + s.max + ' · FORMAT ' + fmt}</div>
+    ${s.ok ? '' : `<div class="bar" style="margin-top:8px"><i style="width:${Math.min(100, Math.round(s.cur / s.max * 100))}%;background:var(--ok)"></i></div>`}</div>`;
+  o.classList.add('on');
+}
+function fermerPlein() { const o = $('#plein'); if (o) o.classList.remove('on'); }
 function blocVideotheque(e) {
   const ok = e.succes.filter(s => s.ok), der = ok.slice(-4).reverse(), prochains = e.succes.filter(s => !s.ok).sort((a, b) => b.cur / b.max - a.cur / a.max).slice(0, 4 - der.length);
-  return `<button class="vidban" data-act="videotheque"><div class="vidh"><b>🎬 TA VIDÉOTHÈQUE</b><span>${ok.length}/${e.succes.length} affiches ›</span></div><div class="vidrow">${der.map(s => affiche(s.id, DN[s.d], 58)).join('')}${prochains.map(s => affiche(s.id, DN[s.d], 58, true)).join('')}</div></button>`;
+  return `<button class="vidban" data-act="videotheque"><div class="vidh"><b>🎬 TA VIDÉOTHÈQUE <span class="pinchip" data-act="vitrine" role="button">📌 ${(vitrine() || []).length}/3 au profil</span></b><span>${ok.length}/${e.succes.length} affiches ›</span></div><div class="vidrow">${der.map(s => affiche(s.id, DN[s.d], 58)).join('')}${prochains.map(s => affiche(s.id, DN[s.d], 58, true)).join('')}</div></button>`;
 }
 function rendreVitrine() {
   const G = badgesGagnes(), v = vitrine() || [];
@@ -3316,7 +3347,7 @@ function alertes() {
   const d = now.getDate(), fr = d / dim(y, m);
   budgetsDefiables().forEach(c => { let t = 0, n = 0; for (let k = 1; k <= 6; k++) { let yy = y, mm = m - k; while (mm < 1) { mm += 12; yy--; } if (moisActif(yy, mm)) { t += depenseMois(c.nom, yy, mm); n++; } } const moy = n ? t / n : 0, cur = depenseMois(c.nom, y, m);
     if (moy > 10 && cur > moy * 1.3 && cur > c.budget * fr) out.push({ id: 'drap' + c.nom + y + m, ico: '⚠️', txt: `${esc(c.nom)} : déjà <b>${e0(cur)}</b> ce mois-ci, ta moyenne est ${e0(moy)}` }); });
-  occurrences(y, m).filter(o => o.type !== 'Revenu' && o.type !== 'Retrait' && o.v >= 150 && o.jour >= d && o.jour <= d + 3).forEach(o => out.push({ id: 'gros' + o.lib + y + m, ico: '🏦', txt: `${esc(o.lib)} : <b>${e2(o.v)}</b> prélevés le ${o.jour}` }));
+  occurrences(y, m).filter(o => o.type !== 'Revenu' && o.type !== 'Retrait' && o.v >= 150 && o.jour > d && o.jour <= d + 3).forEach(o => out.push({ id: 'gros' + o.lib + y + m, ico: '🏦', txt: `${esc(o.lib)} : <b>${e2(o.v)}</b> prélevés le ${o.jour}` }));
   const vues = LS.get('alertesVues', []); return out.filter(a => !vues.includes(a.id));
 }
 function blocAlertes() {
@@ -3997,6 +4028,7 @@ function toast(txt, btn, fn) {
 /* ================= ÉVÉNEMENTS ================= */
 document.addEventListener('click', ev => {
   const k = ev.target.closest('[data-k]'); if (k && S.form && S.form.montant !== undefined && !S.form.mode.match(/ech|cat|bud|solde|regl/)) { touche(k.dataset.k); return; }
+  if (ev.target.id === 'plein') { fermerPlein(); return; }
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
   if (!S.form && el.closest('#sheetIn') && a !== 'close') return; // feuille déjà fermée : clic fantôme ignoré
@@ -4071,6 +4103,10 @@ document.addEventListener('click', ev => {
     case 'tuto': S.retourSaisie = S.form; S.form = { mode: 'tuto' }; rendreForm(); $('#sheet').scrollTop = 0; break;
     case 'tuto-ok': LS.set('tutoVu', true); if (S.retourSaisie) { S.form = S.retourSaisie; S.retourSaisie = null; rendreForm(); } else fermer(); break;
     case 'vit': basculerVitrine(el.dataset.id); break;
+    case 'plein': ouvrirPlein(el.dataset.id); break;
+    case 'plein-x': fermerPlein(); break;
+    case 'plein-pin': { const id = 's:' + el.dataset.id; if (!epingle(id) && (vitrine() || []).length >= 3) { fermerPlein(); S.form = { mode: 'vitrine' }; rendreForm(); ouvrirSheet(); break; }
+      basculerVitrine(id); ouvrirPlein(el.dataset.id); if (S.form && S.form.mode === 'videotheque') rendreVideotheque(); break; }
     case 'dmsg': if (el.dataset.m) toast(el.dataset.m); break;
     case 'anom-voulu': { const e = trouver(el.dataset.id); if (!e) break; const avant = e.lib, i0 = el.dataset.i;
       if (!/✓\s*$/.test(e.lib || '')) { e.lib = String(e.lib || e.cat).trim() + ' ✓'; e.pending = true; enfiler({ op: 'update', id: e.id }); }
