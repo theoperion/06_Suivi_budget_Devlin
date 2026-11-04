@@ -712,6 +712,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 .anoml{padding-left:16px;margin:8px 0 0}.anoml li{margin-bottom:10px}.anoml small{display:block;opacity:.8;margin-top:2px}.anomacts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .anomb{font:inherit;font-size:12px;font-weight:600;padding:4px 9px;border:1px solid currentColor;border-radius:6px;color:inherit}.anomb.ok{background:var(--ok);border-color:var(--ok);color:#fff}
 .anomli{display:block;width:100%;text-align:left;font:inherit;color:inherit;padding:4px 0}.anomli small{display:block;opacity:.8;margin-top:2px}.anomli b{display:inline-block;margin-top:5px;padding:3px 8px;border:1px solid currentColor;border-radius:6px;font-weight:600;font-size:12px}
+.regfold{display:flex;justify-content:space-between;width:100%;text-align:left;border-bottom:1px dashed var(--rule);padding-bottom:6px}
 </style>
 </head>
 <body>
@@ -742,7 +743,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '8.1';
+const VERSION = '8.3';
 // Fonctionnalités masquables (Réglages). Masquer = ne plus afficher ; les données continuent d'être enregistrées.
 const FONCS = [
   ['pj', 'Montant par jour', 'sous le grand chiffre et à la saisie'],
@@ -1368,7 +1369,7 @@ const INFOS = {
   prelever: ['À PRÉLEVER', "Les charges et abonnements de l'échéancier qui ne sont pas encore passés ce mois-ci, plus tes achats prévus. C'est l'argent déjà « réservé »."],
   nd: ['NON DÉPENSÉ', "Depuis janvier : revenus − dépenses. Comprend l'argent resté sur ton compte et celui parti en épargne."],
   courbe: ['SOLDE PRÉVU', "Ton solde en banque jour par jour. Trait plein : estimé jusqu'à aujourd'hui. Pointillés : la suite, si tu dépenses tes budgets au rythme prévu. Points verts : entrées de l'échéancier (salaire…). Points rouges : sorties (loyer, abonnements, virements…) et achats prévus. Une dépense saisie dans ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue) ; un dépassement de budget la fait descendre. Sous 0 € : découvert."] };
-const qi = k => `<span class="qi" data-act="info" data-k="${k}" role="button" aria-label="Explication">?</span>`;
+const qi = k => LS.get('aidesOff', false) ? '' : `<span class="qi" data-act="info" data-k="${k}" role="button" aria-label="Explication">?</span>`;
 // Détail des écritures pas encore envoyées au fichier, avec la dernière erreur
 function descOp(o) {
   const e = trouver(o.id), a = trouverAv && trouverAv(o.id), x = trouverEch(o.id);
@@ -2151,6 +2152,7 @@ function rendreReglages() {
     <button class="opt" data-act="go:budgets"><span>Budgets par catégorie</span><span class="muted mono" style="font-size:12px">${e0(bud)}/mois ›</span></button>
     <button class="opt" data-act="go:cats"><span>Catégories et favorites</span><span class="muted mono" style="font-size:12px">${cats().length} · ${S.data.libres || 0} libre${(S.data.libres || 0) > 1 ? 's' : ''} ›</span></button>
     <button class="opt" data-act="go:solde"><span>Mon solde (quand tu veux, idéalement le 1er)</span><span class="muted mono" style="font-size:12px">${lc ? 'dernier : ' + lc.date : 'jamais noté'} ›</span></button>
+    <div style="margin-top:10px"></div>${tg('aides', !LS.get('aidesOff', false), "Petits « ? » d'aide sur l'accueil", 'explications à côté d\'Argent restant, Fin de mois, du graphique…')}
     <div class="grp" style="margin-top:18px">ACCUEIL</div>
     <div class="grp" style="margin:6px 0 0;letter-spacing:1px">ORDRE DES BUDGETS SUR L'ACCUEIL</div>
     <div class="note" style="margin:2px 0 4px;display:block">${ob === 'perso' ? 'Mon ordre : celui que tu as choisi dans Réglages › Catégories (flèches ▲▼).' : 'Les plus urgents d\'abord : ceux proches de leur limite, puis ceux déjà dépassés, puis ceux bien tenus.'}</div>
@@ -2161,11 +2163,11 @@ function rendreReglages() {
     <div class="grp" style="margin-top:18px">CONFORT</div>
     ${tg('discret', LS.get('discret', false), 'Mode discret', 'floute les montants quand tu montres ton téléphone')}
     ${tg('vibre', LS.get('vibre', true), 'Vibrations', 'petit retour quand tu enregistres')}
-    <div class="grp" style="margin-top:18px">FONCTIONNALITÉS AFFICHÉES</div>
-    <div class="note" style="margin:2px 0 4px">Masquer ne supprime rien : tes données restent enregistrées et réapparaissent si tu réactives.</div>
+    <button class="grp regfold" data-act="regfonc" style="margin-top:18px"><span>FONCTIONNALITÉS ET NOUVEAUTÉS</span><span>${FONCS.filter(([k]) => dispo(k) && on(k)).length}/${FONCS.filter(([k]) => dispo(k)).length} ACTIVÉES · ${S.regFonc ? 'MOINS ▴' : 'VOIR ▾'}</span></button>
+    ${S.regFonc ? `    <div class="note" style="margin:2px 0 4px">Masquer ne supprime rien : tes données restent enregistrées et réapparaissent si tu réactives.</div>
     ${FONCS.filter(([k]) => dispo(k)).map(([k, l, d]) => tg('fonc:' + k, on(k), l, d)).join('')}
     ${FEAT.filter(f => !dispo(f[0])).map(f => `<button class="soon" data-act="soon" data-k="${f[0]}"><span>🔒</span><div><b>${esc(f[1])}</b><small>disponible en ${esc(MOIS[f[4] - 1].toLowerCase())} · touche pour l'essayer dès maintenant</small></div></button>`).join('')}
-    ${ACCES_ANTICIPE ? tg('anticipe', anticipe(), 'Accès anticipé', 'débloque tout de suite les nouveautés prévues pour les prochains mois') : ''}
+    ${ACCES_ANTICIPE ? tg('anticipe', anticipe(), 'Accès anticipé', 'débloque tout de suite les nouveautés prévues pour les prochains mois') : ''}` : ''}
     <div class="grp" style="margin-top:18px">DONNÉES</div>
     ${S.data.url ? `<a class="opt" href="${esc(S.data.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir mon fichier Google Sheets</span><span class="muted">↗</span></a>` : ''}
     <button class="opt" data-act="${S.queue.length ? 'file' : 'refresh'}"><span>${S.queue.length ? 'Envois en attente' : 'Actualiser depuis le fichier'}</span><span class="${S.queue.length ? 'c-bad' : 'muted'} mono" style="font-size:12px">${S.queue.length ? S.queue.length + ' en attente · voir ›' : 'à jour'}</span></button>
@@ -4147,6 +4149,8 @@ document.addEventListener('click', ev => {
     case 'seuil': LS.set('seuil', +el.dataset.t); rendreReglages(); rendre(true); break;
     case 'discret': LS.set('discret', !LS.get('discret', false)); if (S.form && S.form.mode === 'reglages') rendreReglages(); rendre(true); break;
     case 'vibre': LS.set('vibre', !LS.get('vibre', true)); rendreReglages(); break;
+    case 'aides': LS.set('aidesOff', !LS.get('aidesOff', false)); rendreReglages(); rendre(true); break;
+    case 'regfonc': S.regFonc = !S.regFonc; rendreReglages(); break;
     case 'dup': { const e = trouver(S.form.id); if (e) ouvrirSaisie(e, true); break; }
     case 'sgn': S.form.montant = S.form.montant.startsWith('-') ? S.form.montant.slice(1) : '-' + (S.form.montant || ''); majHint(); break;
     case 'libsug': S.form.lib = el.dataset.l; $('#lib').value = el.dataset.l; break;
