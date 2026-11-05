@@ -1,6 +1,6 @@
 // Chaque appli ne nettoie que SES anciens caches : les 3 applis partagent la même adresse GitHub.
 const PREFIXE = 'jauge-devlin-v';
-const CACHE = PREFIXE + '40';
+const CACHE = PREFIXE + '41';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', e => {

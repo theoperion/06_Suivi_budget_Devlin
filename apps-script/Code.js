@@ -1,5 +1,5 @@
 /**
- * BUDGET · API du budget de Devlin (Apps Script) · v5.9
+ * BUDGET · API du budget de Devlin (Apps Script) · v5.10
  * ------------------------------------------
  * Ce script est relié au fichier budget dans lequel il a été créé.
  * Il lit les Paramètres, l'Échéancier et le Journal, et écrit dans le Journal.
@@ -11,6 +11,7 @@
  * v5.2 : la date de la dépense (colonne « Saisi le ») se modifie aussi quand on corrige une ligne.
  * v5.3 : fonction verifier() pour donner les autorisations et tester le script en un clic.
  * v5.6 : « À venir » : le mois est écrit en texte (corrige l'échec des éléments à venir).
+ * v5.10 : « À venir » accepte un mois futur pas encore présent dans la liste du Journal.
  * v5.9 : renommer une catégorie met aussi à jour le défi du mois ; on ne peut plus retirer une catégorie encore utilisée dans « À venir ».
  * v5.8 : classeur ouvert une seule fois par demande ; onglet caché « Diagnostic » (durée et résultat de chaque demande).
  * v5.7 : fichier occupé → réponse OCCUPE (l'appli réessaie) au lieu d'une erreur qui faisait perdre la saisie.
@@ -24,7 +25,7 @@
  */
 
 const CLE_A_ENREGISTRER = 'CHANGE-MOI';
-const VERSION_API = '5.9';
+const VERSION_API = '5.10';
 
 // Laisse vide si le script est ouvert depuis le fichier (Extensions > Apps Script).
 const ID_FICHIER = '1TFXRVMLuVv_NauUH7VyJ4Pgd-Us5JuD3_3lzN_ojfvQ'; // fichier budget de Devlin
@@ -285,13 +286,15 @@ function avecVerrou_(fn) {
   try { return fn(); } finally { lock.releaseLock(); }
 }
 
-function valider_(l) {
+function valider_(l, futurOk) {
   const ss = classeur_();
   const par = ss.getSheetByName('Paramètres');
   const mois = moisListe_(par);
   const cats = par.getRange('A10:A40').getValues().map(r => String(r[0]).trim());
   if (!l) throw new Error('Ligne vide.');
-  if (mois.indexOf(l.mois) < 0) return 'Mois inconnu : ' + l.mois;
+  // « À venir » : un mois futur pas encore dans la liste du Journal est accepté s'il est bien écrit (v5.10).
+  const moisBienEcrit = /^(Janvier|Février|Mars|Avril|Mai|Juin|Juillet|Août|Septembre|Octobre|Novembre|Décembre) \d{4}$/.test(String(l.mois));
+  if (mois.indexOf(l.mois) < 0 && !(futurOk && moisBienEcrit)) return 'Mois inconnu : ' + l.mois;
   if (cats.indexOf(l.cat) < 0) return 'Catégorie inconnue : ' + l.cat;
   const m = Number(l.montant);
   const ecart = /^Écart/.test(String(l.lib || ''));
@@ -499,7 +502,7 @@ function avIdentique_(v, a) {
 function avEnregistrer_(row, attendu, a) {
   const ss = classeur_(), sh = ss.getSheetByName('À venir');
   if (!sh) return { ok: false, error: 'INVALIDE', message: 'Feuille « À venir » introuvable.' };
-  const err = valider_({ mois: a.mois, lib: a.lib, cat: a.cat, montant: a.montant });
+  const err = valider_({ mois: a.mois, lib: a.lib, cat: a.cat, montant: a.montant }, true);
   if (err) return { ok: false, error: 'INVALIDE', message: err };
   if (!row) {
     const v = sh.getRange(4, 1, finAv_(sh) - 3, 4).getValues();

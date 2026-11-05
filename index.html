@@ -700,7 +700,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.2';
+const VERSION = '9.3';
 // Fonctionnalités masquables (Réglages). Masquer = ne plus afficher ; les données continuent d'être enregistrées.
 const FONCS = [
   ['pj', 'Montant par jour', 'sous le grand chiffre et à la saisie'],
@@ -722,6 +722,8 @@ const progresVisible = () => on('defi') || on('series') || on('bilan') || on('je
 // Optionnel : lien proposé par défaut au premier lancement. Laisser vide pour la version commune.
 const API_DEFAUT = 'https://script.google.com/macros/s/AKfycbyq1DoL_nP5dOMlHvWdxubnv2gW63MWgHeZ3wo_ZYZuXotnNHjrIjnXrTmSt5BQYAv90Q/exec';
 const API_ATTENDUE = '5.2'; // version minimale du script ; les versions plus récentes sont acceptées
+// Compare les versions partie par partie : « 5.10 » est bien plus récent que « 5.2 ».
+const versionAuMoins = (v, min) => { const a = String(v || '0').split('.').map(Number), b = String(min).split('.').map(Number); for (let i = 0; i < Math.max(a.length, b.length); i++) { const x = a[i] || 0, y = b[i] || 0; if (x !== y) return x > y; } return true; };
 
 /* ================= OUTILS ================= */
 const IN_GAS = typeof google !== 'undefined' && google.script && google.script.run;
@@ -1070,7 +1072,7 @@ function rendreRemb() {
   lierChamps();
 }
 function okRemb() {
-  const f = S.form, v = Math.round(parseFloat(String(f.montant || '').replace(',', '.')) * 100) / 100;
+  const f = S.form, v = Math.round(numTxt(f.montant) * 100) / 100;
   if (!(v > 0)) { $('#ferr').textContent = 'Tape le montant reçu'; return; }
   if (v > f.du + 0.005) { $('#ferr').textContent = 'Plus que ce qu\'il te doit (' + e2(f.du) + ')'; return; }
   const y = now.getFullYear(), m = now.getMonth() + 1;
@@ -1344,7 +1346,7 @@ function cartePointBas() {
     <div class="pbleg"><span><i></i>estimé</span><span><i style="background:repeating-linear-gradient(90deg,var(--ink2) 0 4px,transparent 4px 7px)"></i>prévu</span><span><i style="width:2px;height:10px;background:var(--acc,var(--ok))"></i>aujourd'hui</span><span class="c-ok">● entrée</span><span class="c-bad">● sortie</span></div></button>`;
 }
 function alerteVersion() {
-  if (IN_GAS || !S.data || parseFloat(S.data.apiVersion) >= parseFloat(API_ATTENDUE)) return '';
+  if (IN_GAS || !S.data || versionAuMoins(S.data.apiVersion, API_ATTENDUE)) return '';
   return `<div class="alert" style="cursor:default">⚠ Ton Apps Script n'est pas à jour : certaines modifications ne seront pas enregistrées.<ul style="list-style:none;padding:0"><li>Dans Apps Script, recolle le dernier Code.gs, puis Déployer › Gérer les déploiements › crayon › Nouvelle version › Déployer.</li></ul></div>`;
 }
 const INFOS = {
@@ -1390,11 +1392,18 @@ function lignePJ() {
   const fin = dim(S.y, S.m);
   return `<div class="pj"><b>${e0(Math.floor(p.v))}</b> par jour jusqu'au ${fin}${p.jours > 1 ? '' : ' (dernier jour)'}</div>`;
 }
+// Envois bloqués (3 essais ratés ou plus) ou refusés : un bandeau visible sur l'accueil, qui ouvre « Envois » (E2).
+function alerteEnvois() {
+  const o = S.queue[0], rj = LS.get('rejets', []).length;
+  if (o && (o.essais || 0) >= 3) return `<div class="alert"><button data-act="file" style="display:block;width:100%;text-align:left"><b style="font-weight:600">⚠ ${S.queue.length} ENVOI${S.queue.length > 1 ? 'S' : ''} EN ATTENTE</b> : ton fichier ne répond pas. L'appli réessaie toute seule ; touche pour voir le détail.</button></div>`;
+  if (rj) return `<div class="alert"><button data-act="file" style="display:block;width:100%;text-align:left"><b style="font-weight:600">⚠ ${rj} DÉPENSE${rj > 1 ? 'S' : ''} REFUSÉE${rj > 1 ? 'S' : ''}</b> par ton fichier : touche pour la renvoyer ou la supprimer.</button></div>`;
+  return '';
+}
 function vueAccueil() {
   const b = bilan(S.y, S.m), solde = S.jmode === 'solde';
   const sc = solde ? soldeCalcule(S.y, S.m) : null;
   const val = solde ? sc : b.restant;
-  let h = carteBilanMois() + (b.st === 'cours' ? banniereResume() : '') + alerteVersion() + blocAnomalies() + (ouvert('alertes') && b.st === 'cours' ? blocAlertes() : '');
+  let h = carteBilanMois() + (b.st === 'cours' ? banniereResume() : '') + alerteVersion() + alerteEnvois() + blocAnomalies() + (ouvert('alertes') && b.st === 'cours' ? blocAlertes() : '');
   if (b.st === 'cours') h += banniereEv();
   h += `<div class="gauge">${b.st === 'cours' ? blocMascotte() + blocVitrine() : ''}<button data-act="jmode" style="display:block;width:100%" aria-label="Basculer argent restant / solde">${jaugeSVG(b)}
     <div class="big ${val != null && val < 0 ? 'c-bad' : ''}" id="big" data-v="${val == null ? 0 : val}">${val == null ? '—' : e0(val)}</div>
@@ -1471,7 +1480,7 @@ function htmlListe() {
   const rows = l.map(({ e, c }) => {
     const t = c ? c.type : '';
     if (t === 'Revenu' || t === 'Retrait') rev += e.montant; else dep += e.montant;
-    return `<button class="jl ${e.pending ? 'pend' : ''} ${e.nw ? 'nw' : ''}" data-act="edit" data-id="${e.id}"><div class="l"><div>${esc(e.lib || e.cat)}</div><div class="c">${S.filtre.q ? esc(MC[e.m - 1]) + ' · ' : ''}${esc(e.cat)}${e.date ? ' · le ' + (+e.date.slice(8)) + '/' + e.date.slice(5, 7) : ''}${c ? '' : ' · catégorie inconnue'}${e.pending ? ' · envoi…' : ''}</div></div>
+    return `<button class="jl ${e.pending ? 'pend' : ''} ${e.nw ? 'nw' : ''}" data-act="edit" data-id="${e.id}"><div class="l"><div>${esc(e.lib || e.cat)}</div><div class="c">${S.filtre.q ? esc(MC[e.m - 1]) + ' · ' : ''}${esc(e.cat)}${e.date ? ' · le ' + (+e.date.slice(8)) + '/' + esc(e.date.slice(5, 7)) : ''}${c ? '' : ' · catégorie inconnue'}${e.pending ? ' · envoi…' : ''}</div></div>
       ${montantLigne(t, e.montant)}</button>`;
   }).join('');
   return `<div class="sec" style="margin-top:14px"><span>${l.length} LIGNE${l.length > 1 ? 'S' : ''}${S.filtre.q ? ' EN ' + S.y : ''}</span><span>−${e0(dep)}${rev ? ' · +' + e0(rev) : ''}</span></div>` + rows;
@@ -1927,7 +1936,7 @@ function okSolde() {
   appel('solde-dep', { annee: y, valeur: v });
   // 2) fiche ② du fichier : fin du mois précédent, cohérente avec la nouvelle base (écart = 0)
   if (m > 1) { const fin = Math.round((soldeCalcule(y, m - 1) - esp) * 100) / 100, mo = MOIS[m - 2][0].toUpperCase() + MOIS[m - 2].slice(1); appel('solde-ctrl', { mois: mo, solde: fin, especes: esp }); S.data.controle = { mois: mo, solde: fin, especes: esp }; }
-  else appel('solde-ctrl', { mois: 'Janvier', solde: null, especes: esp });
+  else { appel('solde-ctrl', { mois: 'Janvier', solde: null, especes: esp }); S.data.controle = { mois: 'Janvier', solde: null, especes: esp }; } // l'appli suit tout de suite (E6)
   const hist = LS.get('controles', []);
   hist.unshift({ date: now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }), mois: MC[m - 1] + ' ' + y, ecart: e == null ? 0 : Math.round(e * 100) / 100, solde: Math.round(t * 100) / 100 });
   LS.set('controles', hist.slice(0, 24)); LS.set('ctrlFait', nowYM()); sauver();
@@ -2183,7 +2192,9 @@ function rendreCats() {
   h += (S.data.libres || 0) > 0 ? `<button class="add" data-act="cat-new">+ NOUVELLE CATÉGORIE</button>`
     : `<div class="note" style="margin-top:14px">Plus de place libre dans le fichier : retire une catégorie inutilisée pour en ajouter une.</div>`;
   h += `<div class="note">★ épingle une catégorie en tête de la saisie rapide. Les flèches règlent l'ordre d'affichage. Touche un nom pour le renommer, changer son groupe ou le retirer.</div>`;
-  GROUPES.concat(['Avances', 'Sans groupe']).forEach(g => {
+  // Un groupe mal écrit dans le fichier s'affiche quand même, pour pouvoir corriger la catégorie (E5).
+  const connus = GROUPES.concat(['Avances', 'Sans groupe']);
+  connus.concat(Object.keys(parG).filter(g => !connus.includes(g))).forEach(g => {
     const z = parG[g]; if (!z) return;
     h += `<div class="grp" style="margin-top:16px">${esc(g.toUpperCase())}</div>`;
     z.forEach((c, i) => {
@@ -2218,7 +2229,7 @@ function rendreFiche() {
   const bars = pts.map((p, i) => { const h = p.v / mx * (H - 18); return `<rect x="${i * bw + 3}" y="${H - 14 - h}" width="${bw - 6}" height="${Math.max(h, p.v ? 1.5 : 0)}" rx="2" fill="var(--ink)" opacity="${p.fut ? 0.25 : p.y === S.y && p.m === S.m ? 1 : 0.55}"/><text x="${i * bw + bw / 2}" y="${H - 2}" text-anchor="middle" font-size="9" font-family="IBM Plex Mono,monospace" fill="var(--ink3)">${MC[p.m - 1][0].toUpperCase()}</text>`; }).join('');
   const ym = H - 14 - moy / mx * (H - 18);
   const top = S.journal.filter(e => !e.deleted && e.cat === f.cat && e.y === S.y && e.montant > 0).sort((a, b) => b.montant - a.montant).slice(0, 5);
-  $('#sheetIn').innerHTML = enteteSheet(c.nom.toUpperCase()) + `
+  $('#sheetIn').innerHTML = enteteSheet(esc(c.nom.toUpperCase())) + `
     <div class="mono muted" style="font-size:11px;letter-spacing:1px;margin-top:4px">${esc(c.groupe.toUpperCase())}${c.budget > 0 ? ' · BUDGET ' + e0(c.budget) + '/MOIS · ' + esc((c.suivi || '').toUpperCase()) : ''}</div>
     <svg viewBox="0 0 ${W} ${H}" style="width:100%;margin-top:12px" role="img" aria-label="12 derniers mois">${bars}<line x1="0" x2="${W}" y1="${ym}" y2="${ym}" stroke="var(--bad)" stroke-dasharray="4 3" stroke-width="1.2"/></svg>
     <div class="ticket" style="margin-top:10px"><div class="tl"><span>MOYENNE / MOIS (12 MOIS)</span><span>${e2(moy)}</span></div><div class="tl"><span>TOTAL ${S.y} À CE JOUR</span><span>${e2(anT)}</span></div><div class="tl"><span>${esc(MC[S.m - 1].toUpperCase())} ${S.y}</span><span>${e2(montantCat(f.cat, S.y, S.m))}</span></div></div>
@@ -2252,7 +2263,7 @@ function rendreDefi() {
   const i = $('[data-f="montant"]'); if (i) i.addEventListener('input', () => { S.form.touche = true; });
 }
 function okDefi() {
-  const f = S.form, v = parseFloat(String(f.montant || '').replace(',', '.'));
+  const f = S.form, v = numTxt(f.montant); // « 1 000 » = 1000 € (E3)
   if (!f.cat) { $('#ferr').textContent = 'Choisis un budget'; return; }
   if (!(v >= 0)) { $('#ferr').textContent = 'Tape un plafond'; return; }
   const k = cleMois(f.y, f.m), m = Math.round(v * 100) / 100;
@@ -3994,7 +4005,10 @@ document.addEventListener('click', ev => {
     case 'ech-new': ouvrirEch(null); break;
     case 'ech-allcat': S.form.all = !S.form.all; rendreEch(); break;
     case 'ech-cat': S.form.cat = el.dataset.cat; S.form.all = false; rendreEch(); break;
-    case 'ech-freq': S.form.freq = el.dataset.t; if (S.form.freq !== 'Mensuel') S.form.g = 12; rendreEch(); break;
+    case 'ech-freq': { const f = S.form, av = f.freq; f.freq = el.dataset.t; // le mois de fin d'une ligne mensuelle revient si on y revient (E4)
+      if (av === 'Mensuel' && f.freq !== 'Mensuel') f.gMens = f.g;
+      if (f.freq !== 'Mensuel') f.g = 12; else if (av !== 'Mensuel' && f.gMens) f.g = f.gMens;
+      rendreEch(); } break;
     case 'ech-pause': S.form.pause = !S.form.pause; rendreEch(); break;
     case 'stp': stepEch(el.dataset.s, el.dataset.d === 'x' ? 'x' : +el.dataset.d); break;
     case 'ech-save': enregistrerEch(false); break;
