@@ -700,7 +700,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.1';
+const VERSION = '9.2';
 // Fonctionnalités masquables (Réglages). Masquer = ne plus afficher ; les données continuent d'être enregistrées.
 const FONCS = [
   ['pj', 'Montant par jour', 'sous le grand chiffre et à la saisie'],
@@ -3121,7 +3121,8 @@ function etatMission(y, m) {
   const mi = missionDe(y, m); if (!mi) return null;
   const k = y + '-' + String(m).padStart(2, '0'), J = joursJeu().filter(x => x[0].startsWith(k)), st = statut(y, m);
   let cur = 0;
-  if (mi.id === 'we') cur = J.some((x, i) => new Date(x[0] + 'T00:00:00').getDay() === 6 && x[1] === true && J[i + 1] && J[i + 1][1] === true) ? 1 : 0;
+  // Le dimanche peut tomber le mois suivant (samedi 31, dimanche 1er) : on le cherche dans la liste complète des jours.
+  if (mi.id === 'we') { const JA = joursJeu(), pos = new Map(JA.map((x, i) => [x[0], i])); cur = J.some(x => { const n = JA[pos.get(x[0]) + 1]; return new Date(x[0] + 'T00:00:00').getDay() === 6 && x[1] === true && n && n[1] === true; }) ? 1 : 0; }
   else if (mi.id === 'j8') cur = J.filter(x => x[1] === true).length;
   else if (mi.id === 's5') cur = maxSerie(J.map(x => x[1]));
   else if (mi.id === 'baisse') { mi.dep = depenseMois(mi.cat, y, m); cur = st === 'passe' && mi.dep < mi.ref - 0.005 ? 1 : 0; }
@@ -3267,7 +3268,7 @@ function rendreObjEdit() {
   let t = 0, n = 0; for (let k = 1; k <= 6; k++) { let yy = now.getFullYear(), mm = now.getMonth() + 1 - k; while (mm < 1) { mm += 12; yy--; } if (moisActif(yy, mm)) { t += calc(yy, mm).ep; n++; } }
   const sug = n ? Math.max(100, Math.round(t / n * 12 / 100) * 100) : 0;
   $('#sheetIn').innerHTML = enteteSheet("OBJECTIF D'ÉPARGNE " + f.y, null) + `
-    <div class="note" style="display:block;margin-top:10px">Tout ce qui part sur l'épargne dans l'année compte (Échéancier compris), moins les retraits.</div>
+    <div class="note" style="display:block;margin-top:10px">Tout ce qui part sur l'épargne dans l'année compte (Échéancier compris). Les retraits ne sont pas déduits.</div>
     <input class="libin" data-f="montant" inputmode="decimal" placeholder="Montant pour l'année en €" value="${esc(f.montant)}" style="margin-top:12px">
     ${sug ? `<button class="chip sug" data-act="obj-sug" data-v="${sug}">Suggestion : ${e0(sug)} (ton rythme des 6 derniers mois)</button>` : ''}
     <div class="err" id="ferr"></div><button class="go" data-act="obj-ok">ENREGISTRER</button>
@@ -3813,7 +3814,7 @@ function verrouiller(msg) {
 function rendreLien() {
   const f = S.form;
   $('#sheetIn').innerHTML = enteteSheet('RÉGLAGES', 'reglages') + `
-    <div class="note" style="margin-top:14px">Après un nouveau déploiement de ton Apps Script, colle ici le nouveau lien. Ta clé et tes données restent les mêmes.</div>
+    <div class="note" style="margin-top:14px">Ton script a un nouveau lien (nouveau déploiement, ou fichier transféré à ton nom) ? Colle-le ici. Ta clé et tes données restent les mêmes.</div>
     <input class="libin" data-f="url" type="url" value="${esc(f.url)}" placeholder="https://script.google.com/macros/s/…/exec" style="font-size:14px">
     <div class="err" id="ferr"></div><button class="go" data-act="lien-ok">TESTER ET ENREGISTRER</button>`;
   lierChamps();
