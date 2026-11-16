@@ -768,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.11';
+const VERSION = '9.12';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1537,10 +1537,11 @@ function etatDebutMois() {
   if (statut(S.y, S.m) !== 'cours' || now.getDate() > 7 || LS.get('debMoisVu', 0) === nowYM()) return null;
   const t = nowYM() - 1, y = Math.floor((t - 1) / 12), m = ((t - 1) % 12) + 1, cle = y + '-' + m, c = calc(y, m);
   const bil = on('bilan') && (c.rev || c.dep) ? { y, m, cle, ok: LS.get('bilanVu', '') === cle, restant: c.restant } : null;
-  const nc = conseilsBudgets().length, bud = { n: nc, ok: !nc || LS.get('conseilsVu', 0) === nowYM() };
+  const ca = conseilsAnnuels().length, janv = now.getMonth() === 0, nc = conseilsBudgets().length + (janv ? 0 : ca), bud = { n: nc, ok: !nc || LS.get('conseilsVu', 0) === nowYM() };
+  const an = janv ? { n: ca, ok: !ca || LS.get('conseilsVu', 0) === nowYM(), y: now.getFullYear() - 1 } : null;
   const sol = { ok: LS.get('ctrlFait', 0) === nowYM() };
-  if ((!bil || bil.ok) && bud.ok && sol.ok) return null;
-  return { bil, bud, sol };
+  if ((!bil || bil.ok) && bud.ok && sol.ok && (!an || an.ok)) return null;
+  return { bil, bud, sol, an };
 }
 function carteBilanMois() {
   const E = etatDebutMois(); if (!E) return '';
@@ -1548,6 +1549,7 @@ function carteBilanMois() {
   let h = `<div class="debm"><div class="dmh"><span>NOUVEAU MOIS · ${esc(MOIS[now.getMonth()].toUpperCase())}</span><button class="ibtn" data-act="debm-x" aria-label="Fermer">${ico.x}</button></div>`;
   if (E.bil) h += it(E.bil.ok, 'bil-ban', `data-key="${E.bil.cle}" data-y="${E.bil.y}" data-m="${E.bil.m}"`, 'Ton bilan de ' + esc(MOIS[E.bil.m - 1].toLowerCase()), (E.bil.restant >= 0 ? 'fini à +' : 'fini à ') + e0(E.bil.restant) + ' · le récap en images');
   h += it(E.bud.ok, 'debm-bud', '', 'Ajuster tes budgets', E.bud.n ? E.bud.n + ' conseil' + (E.bud.n > 1 ? 's' : '') + " d'après tes 6 derniers mois" : 'tes budgets sont bien réglés');
+  if (E.an) h += it(E.an.ok, 'debm-bud', '', 'Ajuster tes budgets annuels', E.an.n ? 'bilan ' + E.an.y + ' : ' + E.an.n + ' conseil' + (E.an.n > 1 ? 's' : '') : 'tes budgets annuels sont bien réglés');
   h += it(E.sol.ok, 'ctrl', '', 'Contrôle du solde', E.sol.ok ? 'fait pour ce mois ✓' : 'note ce qu\'il y a sur ton compte pour recaler l\'appli');
   return h + '</div>';
 }
@@ -1567,11 +1569,38 @@ function conseilsBudgets() {
   });
   return out.sort((a, b) => (a.sens === 'haut' ? 0 : 1) - (b.sens === 'haut' ? 0 : 1));
 }
+// (9.12) Conseils pour les budgets annuels (ils se dépensent par à-coups : pas de règle « mois par mois ») :
+//  - de janvier à mars : bilan de l'année passée (moyenne des 2 dernières années complètes quand il y en a 2) :
+//    dépassé → monter à ce qui a vraiment été dépensé ; utilisé à moins de 60 % → baisser à mi-chemin ;
+//  - toute l'année : un budget annuel déjà dépassé → l'augmenter (jamais de conseil à la baisse en cours d'année).
+function conseilsAnnuels() {
+  const out = [], r5 = v => Math.ceil(v / 5) * 5, Y = now.getFullYear(), M = now.getMonth() + 1;
+  const actifs = y => new Set(S.journal.filter(e => !e.deleted && e.y === y).map(e => e.m)).size; // mois avec de vraies saisies (l'Échéancier seul ne compte pas)
+  const a1 = M <= 3 && actifs(Y - 1) >= 6, a2 = a1 && actifs(Y - 2) >= 10;
+  cats().forEach(c => {
+    if (!VAR.includes(c.groupe) || c.type !== 'Dépense' || !(c.budget > 0) || c.suivi !== 'Annuel' || estAv(c.nom)) return;
+    const cur = budgets(Y, M).find(o => o.c.nom === c.nom);
+    if (cur && cur.dep > cur.annuel + 0.5) {
+      const v = r5(cur.dep / 12);
+      if (v > c.budget) out.push({ cat: c.nom, sens: 'haut', an: true, actuel: c.budget, v, txt: `déjà dépassé de ${e0(cur.dep - cur.annuel)} cette année (${e0(cur.dep)} dépensés pour ${e0(cur.annuel)} prévus). Augmente-le, ou rattrape sur tes autres budgets.` });
+      return;
+    }
+    if (!a1) return;
+    const ans = [Y - 1].concat(a2 ? [Y - 2] : []), L = ans.map(y => budgets(y, 12).find(o => o.c.nom === c.nom)).filter(Boolean);
+    if (!L.length) return;
+    const dep = L.reduce((t, o) => t + o.dep, 0) / L.length, bud = L.reduce((t, o) => t + o.annuel, 0) / L.length, quand = ans.length > 1 ? `en moyenne sur ${ans[1]} et ${ans[0]}` : `en ${ans[0]}`;
+    if (dep > bud + 0.5) { const v = r5(dep / 12); if (v > c.budget) out.push({ cat: c.nom, sens: 'haut', an: true, actuel: c.budget, v, txt: `${e0(dep)} dépensés ${quand} pour ${e0(bud)} prévus. Ce budget est sans doute trop serré.` }); }
+    else if (dep < bud * 0.6) { const v = r5(Math.max(dep * 1.2, (bud + dep) / 2) / 12); if (v <= c.budget - 5) out.push({ cat: c.nom, sens: 'bas', an: true, actuel: c.budget, v, txt: `seulement ${e0(dep)} dépensés ${quand} pour ${e0(bud)} prévus. Tu peux le baisser pour donner de la marge à un autre.` }); }
+  });
+  return out;
+}
 function blocConseils() {
-  const L = conseilsBudgets(); if (!L.length) return '';
-  return `<div class="grp" style="margin-top:16px">💡 CONSEILS D'APRÈS TES 6 DERNIERS MOIS</div>` + L.map(o => `<div class="consl"><div><b>${esc(o.cat)}</b> · ${o.sens === 'haut' ? `dépassé ${o.n} mois sur ${o.sur} (en moyenne ${e0(o.moy)} pour ${e0(o.actuel)}). Ce budget est sans doute trop serré.` : `toujours bien en dessous (en moyenne ${e0(o.moy)} pour ${e0(o.actuel)}). Tu peux le baisser pour donner de la marge à un autre.`}</div>
-    <button class="chip" data-act="bud-conseil" data-cat="${esc(o.cat)}" data-v="${o.v}">${o.sens === 'haut' ? '▲' : '▼'} Passer à ${e0(o.v)}</button></div>`).join('')
-    + `<div class="note" style="display:block;margin-top:6px">Ce ne sont que des suggestions : augmenter un budget fait baisser ta fin de mois prévue, en baisser un autre la remonte. Touche une catégorie plus bas pour régler à la main.</div>`;
+  const LM = conseilsBudgets(), LA = conseilsAnnuels(); if (!LM.length && !LA.length) return '';
+  const ligneA = o => `<div class="consl"><div><b>${esc(o.cat)}</b> · ${o.txt}</div><button class="chip" data-act="bud-conseil" data-cat="${esc(o.cat)}" data-v="${o.v}">${o.sens === 'haut' ? '▲' : '▼'} ${e0(o.v * 12)}/an<small style="display:block;font-size:10px;opacity:.7">soit ${e0(o.v)}/mois</small></button></div>`;
+  return (LM.length ? `<div class="grp" style="margin-top:16px">💡 CONSEILS D'APRÈS TES 6 DERNIERS MOIS</div>` + LM.map(o => `<div class="consl"><div><b>${esc(o.cat)}</b> · ${o.sens === 'haut' ? `dépassé ${o.n} mois sur ${o.sur} (en moyenne ${e0(o.moy)} pour ${e0(o.actuel)}). Ce budget est sans doute trop serré.` : `toujours bien en dessous (en moyenne ${e0(o.moy)} pour ${e0(o.actuel)}). Tu peux le baisser pour donner de la marge à un autre.`}</div>
+    <button class="chip" data-act="bud-conseil" data-cat="${esc(o.cat)}" data-v="${o.v}">${o.sens === 'haut' ? '▲' : '▼'} Passer à ${e0(o.v)}</button></div>`).join('') : '')
+    + (LA.length ? `<div class="grp" style="margin-top:16px">💡 BUDGETS ANNUELS</div>` + LA.map(ligneA).join('') : '')
+    + `<div class="note" style="display:block;margin-top:6px">Ce ne sont que des suggestions : augmenter un budget fait baisser ta fin de mois prévue, en baisser un autre la remonte. Un budget annuel se règle par mois (total de l'année = 12 × le montant mensuel). Touche une catégorie plus bas pour régler à la main.</div>`;
 }
 // Solde prévu jour par jour, d'aujourd'hui à la fin du mois prochain :
 // prélèvements à leur date, achats prévus, et budgets restants étalés sur les jours.
@@ -1880,7 +1909,7 @@ function sectionsModeEmploi() {
       ['⏱', 'LA JAUGE ET ' + INFOS.restant[0], INFOS.restant[1] + " Sous le chiffre, une phrase te dit si tu dépenses plus vite ou moins vite que prévu."],
       ['🗓', ...I('fin')], ['⏳', ...I('prelever')], ['🌱', ...I('nd')], ['📉', ...I('courbe')],
       ['🎯', ...I('budgets')],
-      ['🗓', 'NOUVEAU MOIS', "Du 1er au 7 du mois, une carte en haut de l'accueil regroupe les 3 choses à faire : voir ton bilan du mois passé, ajuster tes budgets (l'appli propose d'augmenter un budget souvent dépassé, ou d'en baisser un toujours sous-utilisé, d'après tes 6 derniers mois) et faire le contrôle du solde. Chaque point se coche quand il est fait ; le ✕ ferme la carte."],
+      ['🗓', 'NOUVEAU MOIS', "Du 1er au 7 du mois, une carte en haut de l'accueil regroupe les 3 choses à faire : voir ton bilan du mois passé, ajuster tes budgets (l'appli propose d'augmenter un budget souvent dépassé, ou d'en baisser un toujours sous-utilisé, d'après tes 6 derniers mois ; en janvier, le bilan de l'année pour tes budgets annuels, et toute l'année une alerte si un budget annuel est déjà dépassé) et faire le contrôle du solde. Chaque point se coche quand il est fait ; le ✕ ferme la carte."],
       ['🖼', 'LA VITRINE', "De part et d'autre de la jauge : tes affiches à gauche, tes écussons à droite (3 de chaque). Touche-les pour les voir en grand ou changer ceux qui sont exposés."],
       ['🛍', 'ACHATS PLAISIR', "Tout en bas de l'accueil : tes achats plaisir du mois, traduits en heures de travail, et ta liste d'envies (une envie attend quelques jours avant d'être achetée)."]]],
     ['journal', '🧾', 'JOURNAL', 'Toutes tes lignes, mois par mois.', [
