@@ -624,6 +624,10 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 /* 6.9 · médailles vectorielles */
 .xpcompact .ticket{font-size:11.5px;padding:8px 12px}.xpcompact .tl{padding:2px 0}.xpcompact .sec{margin:12px 0 6px}.xpcompact .note{font-size:12px}
 .vitgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}.vitgrid button{border:1.5px solid var(--rule);border-radius:10px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:3px}
+#gains{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 58px);transform:translate(-50%,-10px);opacity:0;z-index:31;width:min(420px,calc(100% - 32px));background:var(--ink);color:var(--paper);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.35;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:opacity .25s,transform .25s;pointer-events:none}
+#gains.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}#gains b{display:block;font-family:var(--mono);font-size:11px;letter-spacing:1.2px;margin-bottom:4px}
+#gains div{padding:3px 0}#gains .gperte{opacity:.65;font-size:12px}#gains .gvoir{display:block;text-align:right;font-family:var(--mono);font-size:11px;letter-spacing:1px;text-decoration:underline;margin-top:4px}
+.vitgrid .vitc{display:flex;flex-direction:column;gap:4px}.vitgrid .vitbig{border:0;padding:3px 2px;border-radius:6px;font-family:var(--mono);font-size:9px;letter-spacing:.8px;color:var(--ink2);text-decoration:underline}
 .vitgrid button.on{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 8%,transparent)}.vitgrid small{font-size:11px;line-height:1.2;text-align:center}.vitgrid em{font-style:normal;font-family:var(--mono);font-size:9px;letter-spacing:.8px;color:var(--ink3)}.vitgrid button.on em{color:var(--ok)}
 /* 6.9 · onglet Défis compact */
 .glance{display:grid;gap:6px;margin-top:4px}.gl{border:1.5px dashed var(--rule);border-radius:10px;padding:7px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-family:var(--mono);min-width:0;text-align:center}
@@ -662,6 +666,9 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 .aconf{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--rule)}.aconf>button:first-child{flex:1;min-width:0;text-align:left}.aconf b{display:block;font-size:14px}.aconf small{font-size:11.5px;color:var(--ink3)}.aconf .chip{flex:none;margin:0}
 .qi{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid currentColor;font-size:9px;font-weight:700;opacity:.65;margin-left:3px;vertical-align:1px;cursor:pointer;letter-spacing:0}
 .lblsub{display:block;font-size:9.5px;letter-spacing:.6px;opacity:.75;margin-top:2px;text-transform:none}
+.espm{text-transform:none;letter-spacing:.3px;color:var(--ink2)}
+.espw{display:block;font-size:10px;letter-spacing:.3px;margin-top:3px;text-transform:none;color:var(--warnInk)}
+body.discret .espv{filter:blur(6px)}
 .gl .glx{font-size:8px;opacity:.85;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gauge .pbg svg{max-width:none;margin:0;width:100%}
 .pbas.decouvert{border-color:var(--bad);box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 18%,transparent);animation:decPulse 1.6s ease-in-out infinite}
@@ -678,6 +685,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
     <button class="mbtn" data-act="prev" aria-label="Mois précédent"><svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
     <button class="mlabel" data-act="mgrid" id="mlabel"></button>
     <button class="mbtn" data-act="next" aria-label="Mois suivant"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    <button class="ibtn" data-act="go-defis" id="hdefis" aria-label="Défis"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg></button>
     <button class="ibtn" data-act="go-succes" id="hprog" aria-label="Succès"><svg class="i" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M10 17h4"/></svg><span class="hniv" id="hniv"></span></button>
     <button class="ibtn" data-act="gear" aria-label="Réglages"><svg class="i" viewBox="0 0 24 24"><path d="M10.3 4.3c.4-1.8 3-1.8 3.4 0a1.7 1.7 0 0 0 2.6 1.1c1.5-.9 3.3.8 2.4 2.4a1.7 1.7 0 0 0 1 2.5c1.9.5 1.9 3.1 0 3.5a1.7 1.7 0 0 0-1 2.6c.9 1.5-.9 3.3-2.4 2.4a1.7 1.7 0 0 0-2.6 1c-.4 1.9-3 1.9-3.4 0a1.7 1.7 0 0 0-2.6-1c-1.5.9-3.3-.9-2.4-2.4a1.7 1.7 0 0 0-1-2.6c-1.9-.4-1.9-3 0-3.5a1.7 1.7 0 0 0 1-2.5c-.9-1.6.9-3.3 2.4-2.4a1.7 1.7 0 0 0 2.6-1.1z"/><circle cx="12" cy="12" r="3"/></svg><span class="dot" id="dot"></span></button>
   </header>
@@ -700,7 +708,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.4';
+const VERSION = '9.5';
 // Fonctionnalités masquables (Réglages). Masquer = ne plus afficher ; les données continuent d'être enregistrées.
 const FONCS = [
   ['pj', 'Montant par jour', 'sous le grand chiffre et à la saisie'],
@@ -769,7 +777,7 @@ function prepData(d) {
 }
 function sauver() { LS.set('cache', { data: S.data, journal: S.journal }); LS.set('queue', S.queue); }
 function entriesFromData(d) {
-  return d.journal.map(r => { const p = parseMois(r.mois); const base = { mois: r.mois, lib: r.lib, cat: r.cat, montant: typeof r.montant === 'number' ? r.montant : Number(r.montant) }; return Object.assign({ id: 'r' + r.row, row: r.row, date: r.date || null, y: p ? p.y : null, m: p ? p.m : null, srv: Object.assign({}, base, { montant: r.montant }) }, base); });
+  return d.journal.map(r => { const p = parseMois(r.mois); const base = { mois: r.mois, lib: r.lib, cat: r.cat, montant: typeof r.montant === 'number' ? r.montant : Number(r.montant) }; return Object.assign({ id: 'r' + r.row, row: r.row, date: r.date || null, especes: !!r.especes, y: p ? p.y : null, m: p ? p.m : null, srv: Object.assign({}, base, { montant: r.montant }) }, base); });
 }
 
 /* ================= THÈME ================= */
@@ -817,78 +825,162 @@ async function rafraichir(force) {
 }
 
 /* ================= FILE D'ÉCRITURES (optimiste) ================= */
-const pick = e => ({ mois: e.mois, lib: e.lib, cat: e.cat, montant: e.montant });
+const pick = e => ({ mois: e.mois, lib: e.lib, cat: e.cat, montant: e.montant, especes: !!e.especes }); // especes : colonne « Payé en » (le contrôle d'identité reste sur A-D)
 // Erreurs passagères du script (fichier occupé, panne Google) : l'envoi reste en file et repart plus tard, comme une coupure réseau.
 const ERREURS_PASSAGERES = ['OCCUPE', 'SERVEUR'];
 const pickEch = e => ({ lib: e.lib, cat: e.cat, montant: e.montant, freq: e.freq, jour: e.jour, f: e.f, g: e.g, h: e.h, i: e.i, pause: !!e.pause });
 const trouverEch = id => S.data && S.data.echeancier.find(e => e.id === id);
 const trouver = id => S.journal.find(e => e.id === id);
-function enfiler(op) { S.queue.push(op); sauver(); pomper(); }
-async function pomper() {
-  if (S.busy) return;
-  const op = S.queue[0];
-  // Actualisation seulement si un envoi vient d'aboutir (sinon : double téléchargement au démarrage, au retour…)
-  if (!op) { setSync('ok'); if (S.envoye) { S.envoye = false; setTimeout(() => rafraichir(true), 1500); } return; }
-  S.busy = true; setSync('sync');
+// F1 : les envois partent par élément. L'ordre est garanti pour un même élément (même id) ;
+// des éléments différents sont indépendants : un envoi qui bloque ne retient plus les autres.
+// Un « réglage » qui touche aux catégories (cat-add/edit/del) reste une barrière : il attend ceux d'avant, ceux d'après l'attendent.
+const LOT_MAX = 20, DELAIS_ENVOI = [2000, 4000, 8000];
+const BARRIERES = ['cat-add', 'cat-edit', 'cat-del'];
+const estBarriere = o => o.op === 'call' && BARRIERES.includes(o.action);
+// Clés d'ordre d'un envoi : deux envois qui partagent une clé partent dans l'ordre de la file.
+function clesOp(o) {
+  if (o.op === 'call') return [o.action === 'pref-set' ? 'pref:' + ((o.payload || {}).cle) : 'reglages'];
+  return o.jid ? [o.id, o.jid] : [o.id];
+}
+const enVol = o => !!(S.enVol && S.enVol.has(o));
+function enfiler(op) {
+  // Plusieurs changements du même réglage : seul le dernier compte (sauf celui déjà en route).
+  if (op.op === 'call' && op.action === 'pref-set') { const c = (op.payload || {}).cle; S.queue = S.queue.filter(o => enVol(o) || !(o.op === 'call' && o.action === 'pref-set' && (o.payload || {}).cle === c)); }
+  S.queue.push(op); sauver(); pomper();
+}
+// Envois prêts à partir : le 1er envoi en attente de chaque élément (hors délai de nouvel essai), au plus « max ».
+// Une seule suppression du Journal par lot, placée en dernier : elle décale les lignes du dessous.
+function choisirLot(max) {
+  const pris = [], vus = new Set(), t = Date.now(); let suppr = null;
+  for (let i = 0; i < S.queue.length; i++) {
+    const o = S.queue[i], k = clesOp(o);
+    if (estBarriere(o)) { if (i === 0 && !(o.prochain > t)) pris.push(o); break; }
+    const libre = !k.some(c => vus.has(c)); k.forEach(c => vus.add(c));
+    if (!libre || o.prochain > t) continue;
+    if (o.op === 'delete') { if (!suppr) suppr = o; continue; }
+    if (pris.length + (suppr ? 1 : 0) >= max) break;
+    pris.push(o);
+  }
+  if (suppr && !pris.some(estBarriere)) { if (pris.length >= max) pris.pop(); pris.push(suppr); }
+  return pris;
+}
+// Prépare un envoi : { action, payload, apres(res) } ou { local } quand rien n'est à envoyer.
+function preparer(op) {
   const J = ['add', 'update', 'delete'].includes(op.op);
   const e = J ? trouver(op.id) : null, x = op.op.startsWith('ech') ? trouverEch(op.id) : null;
-  let res = { ok: true };
+  const P = { e, x, local: { ok: true } };
+  if (op.op === 'call') {
+    const Q = op.payload || {}, de = op.action === 'cat-edit' ? Q.ancien : op.action === 'cat-del' ? Q.nom : null, vers = op.action === 'cat-edit' ? Q.nom : Q.cible;
+    return Object.assign(P, { local: null, action: op.action, payload: op.payload, apres: res => {
+      if (res.ok && de && vers && de !== vers) { S.journal.forEach(z => { if (z.srv && z.srv.cat === de) z.srv.cat = vers; }); S.data.echeancier.forEach(z => { if (z.srv && z.srv.cat === de) z.srv.cat = vers; }); (S.data.avenir || []).forEach(z => { if (z.srv && z.srv.cat === de) z.srv.cat = vers; }); } } });
+  }
+  if (op.op === 'ech-save') {
+    if (!x) return P;
+    const env = { lib: x.lib, cat: x.cat, montant: x.montant };
+    return Object.assign(P, { local: null, action: 'ech-save', payload: { row: x.ligne || null, attendu: x.srv, e: pickEch(x) }, apres: res => { if (res.ok) { x.ligne = res.row; x.srv = env; } } });
+  }
+  if (op.op === 'ech-del') {
+    const fin = res => { if (res.ok) S.data.echeancier = S.data.echeancier.filter(z => z !== x); };
+    if (x && x.ligne) return Object.assign(P, { local: null, action: 'ech-del', payload: { row: x.ligne, attendu: x.srv }, apres: fin });
+    return Object.assign(P, { apres: fin });
+  }
+  if (op.op.startsWith('av-')) {
+    const a = trouverAv(op.id);
+    if (a && op.op === 'av-save') { const env = { lib: a.lib, cat: a.cat, montant: a.montant }; return Object.assign(P, { local: null, action: 'av-save', payload: { row: a.row || null, attendu: a.srv, a: { mois: a.mois, lib: a.lib, cat: a.cat, montant: a.montant, jour: a.jour } }, apres: res => { if (res.ok) { a.row = res.row; a.srv = env; a.pending = false; } } }); }
+    if (a && op.op === 'av-del') { const fin = res => { if (res.ok) S.data.avenir = S.data.avenir.filter(z => z !== a); }; return a.row ? Object.assign(P, { local: null, action: 'av-del', payload: { row: a.row, attendu: a.srv }, apres: fin }) : Object.assign(P, { apres: fin }); }
+    if (a && op.op === 'av-paye') { const j = trouver(op.jid); if (j) { const env = pick(j); return Object.assign(P, { local: null, action: 'av-paye', payload: { row: a.row, attendu: a.srv, ligne: Object.assign(pick(j), { date: j.date || null, uid: j.id }) }, apres: res => { if (res.ok) { j.row = res.row; j.srv = env; j.pending = false; } } }); } }
+    return P;
+  }
+  if (!e) return P;
+  if (op.op === 'add') {
+    // On mémorise ce qui part réellement : si la ligne est modifiée pendant l'envoi, la modification suivra (P2).
+    const env = pick(e);
+    return Object.assign(P, { local: null, action: 'add', payload: { ligne: Object.assign(pick(e), { date: e.date || null, uid: e.id }) }, apres: res => { if (res.ok) { e.row = res.row; e.srv = env; } } });
+  }
+  if (op.op === 'update') {
+    if (e.row == null) return P;
+    const env = pick(e);
+    return Object.assign(P, { local: null, action: 'update', payload: { row: e.row, attendu: e.srv, ligne: Object.assign(pick(e), { date: e.date || null }) }, apres: res => { if (res.ok) e.srv = env; } });
+  }
+  if (op.op === 'delete') {
+    if (e.row == null) return Object.assign(P, { apres: () => { S.journal = S.journal.filter(z => z !== e); } });
+    const r0 = e.row;
+    return Object.assign(P, { local: null, action: 'delete', payload: { row: r0, attendu: e.srv }, apres: res => {
+      if (res.ok) { S.journal = S.journal.filter(z => z !== e); if (res.decale) S.journal.forEach(z => { if (z.row != null && z.row > r0) z.row--; }); } } });
+  }
+  return P;
+}
+// Essai raté (réseau, fichier occupé, panne Google) : l'envoi reste en file avec son propre délai ; les autres continuent.
+function essaiRate(op, msg) {
+  op.essais = (op.essais || 0) + 1;
+  op.prochain = Date.now() + (DELAIS_ENVOI[op.essais - 1] || 15000);
+  op.err = msg;
+  S.lastErr = { msg, quand: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) };
+}
+// Réponse définitive (réussie ou refusée) d'un envoi : il quitte la file.
+function terminer(op, p, res) {
+  if (p.apres) p.apres(res);
+  S.queue = S.queue.filter(o => o !== op); S.gen = (S.gen || 0) + 1; S.envoye = true;
+  if (p.e && !S.queue.some(o => o.id === p.e.id)) p.e.pending = false;
+  if (p.x && !S.queue.some(o => o.id === p.x.id)) p.x.pending = false;
+  if (res.ok) return;
+  const vieux = /Action inconnue/.test(res.message || '');
+  // Une dépense refusée n'est plus perdue : elle est gardée de côté, à renvoyer ou supprimer depuis « Envois » (P3).
+  const garde = op.op === 'add' && p.e;
+  if (garde) { const rj = LS.get('rejets', []); rj.push(Object.assign(pick(garde), { date: garde.date || null, msg: res.message || 'erreur', quand: new Date().toLocaleDateString('fr-FR') })); LS.set('rejets', rj); S.journal = S.journal.filter(z => z !== garde); }
+  if (garde) toast('Pas enregistré : ' + (res.message || 'erreur') + '. Gardé de côté dans Réglages › Envois', 'VOIR', () => { S.form = { mode: 'file', arm: false }; rendreForm(); ouvrirSheet(); });
+  else toast(vieux ? "Pas enregistré : ton Apps Script n'est pas à jour (Gérer les déploiements > Nouvelle version)" : 'Pas enregistré dans le fichier : ' + (res.message || 'erreur'));
+}
+function planifierPompe() {
+  clearTimeout(S.reessai);
+  if (!S.queue.length) return;
+  const t = Date.now(), p = Math.min(...S.queue.map(o => o.prochain > t ? o.prochain : t));
+  S.reessai = setTimeout(pomper, Math.max(50, p - t + 20));
+}
+async function pomper() {
+  if (S.busy) return;
+  // Actualisation seulement si un envoi vient d'aboutir (sinon : double téléchargement au démarrage, au retour…)
+  if (!S.queue.length) { setSync('ok'); if (S.envoye) { S.envoye = false; setTimeout(() => rafraichir(true), 1500); } return; }
+  // Script d'avant la 5.11 (pas d'action « lot ») : un envoi à la fois, mais toujours indépendants.
+  const ops = choisirLot(S.sansLot ? 1 : LOT_MAX);
+  if (!ops.length) { planifierPompe(); return; }
+  S.busy = true; S.enVol = new Set(ops); setSync('sync');
+  const preps = ops.map(preparer), aEnvoyer = preps.filter(p => !p.local);
+  let reps = null, erreurGlobale = null, lotRefuse = null;
   try {
-    if (op.op === 'call') {
-      res = await api(op.action, op.payload);
-      const P = op.payload || {}, de = op.action === 'cat-edit' ? P.ancien : op.action === 'cat-del' ? P.nom : null, vers = op.action === 'cat-edit' ? P.nom : P.cible;
-      if (res.ok && de && vers && de !== vers) { S.journal.forEach(z => { if (z.srv && z.srv.cat === de) z.srv.cat = vers; }); S.data.echeancier.forEach(z => { if (z.srv && z.srv.cat === de) z.srv.cat = vers; }); (S.data.avenir || []).forEach(z => { if (z.srv && z.srv.cat === de) z.srv.cat = vers; }); }
+    if (aEnvoyer.length === 1 || (aEnvoyer.length && S.sansLot)) {
+      reps = [await api(aEnvoyer[0].action, aEnvoyer[0].payload)];
+    } else if (aEnvoyer.length) {
+      const r = await api('lot', { ops: aEnvoyer.map(p => Object.assign({ action: p.action }, p.payload)) });
+      if (r && r.ok && Array.isArray(r.res) && r.res.length === aEnvoyer.length) reps = r.res;
+      else if (r && !r.ok && r.error === 'CLE') lotRefuse = r;
+      else if (r && !r.ok && ERREURS_PASSAGERES.includes(r.error)) throw new Error(r.message || 'Script momentanément indisponible');
+      // Ancien script : « Action inconnue : lot » (ou réponse sans détail) → rien n'a été écrit, on repasse en un par un.
+      else if (r && (!r.ok ? /Action inconnue/.test(r.message || '') : !Array.isArray(r.res))) { S.sansLot = true; reps = []; }
+      else throw new Error((r && r.message) || 'Réponse inattendue du script');
     }
-    else if (op.op === 'ech-save') {
-      if (x) { const env = { lib: x.lib, cat: x.cat, montant: x.montant }; res = await api('ech-save', { row: x.ligne || null, attendu: x.srv, e: pickEch(x) }); if (res.ok) { x.ligne = res.row; x.srv = env; } }
-    } else if (op.op === 'ech-del') {
-      if (x && x.ligne) { res = await api('ech-del', { row: x.ligne, attendu: x.srv }); }
-      if (res.ok) S.data.echeancier = S.data.echeancier.filter(z => z !== x);
-    }
-    else if (op.op.startsWith('av-')) {
-      const a = trouverAv(op.id);
-      if (a && op.op === 'av-save') { const env = { lib: a.lib, cat: a.cat, montant: a.montant }; res = await api('av-save', { row: a.row || null, attendu: a.srv, a: { mois: a.mois, lib: a.lib, cat: a.cat, montant: a.montant, jour: a.jour } }); if (res.ok) { a.row = res.row; a.srv = env; a.pending = false; } }
-      else if (a && op.op === 'av-del') { if (a.row) res = await api('av-del', { row: a.row, attendu: a.srv }); if (res.ok) S.data.avenir = S.data.avenir.filter(z => z !== a); }
-      else if (a && op.op === 'av-paye') { const j = trouver(op.jid); if (j) { const env = pick(j); res = await api('av-paye', { row: a.row, attendu: a.srv, ligne: Object.assign(pick(j), { date: j.date || null, uid: j.id }) }); if (res.ok) { j.row = res.row; j.srv = env; j.pending = false; } } }
-    }
-    else if (!e) res = { ok: true };
-    else if (op.op === 'add') {
-      // On mémorise ce qui part réellement : si la ligne est modifiée pendant l'envoi, la modification suivra (P2).
-      const env = pick(e);
-      res = await api('add', { ligne: Object.assign(pick(e), { date: e.date || null, uid: e.id }) });
-      if (res.ok) { e.row = res.row; e.srv = env; }
-    } else if (op.op === 'update') {
-      if (e.row != null) { const env = pick(e); res = await api('update', { row: e.row, attendu: e.srv, ligne: Object.assign(pick(e), { date: e.date || null }) }); if (res.ok) e.srv = env; }
-    } else if (op.op === 'delete') {
-      if (e.row != null) {
-        res = await api('delete', { row: e.row, attendu: e.srv });
-        if (res.ok) { const r0 = e.row; S.journal = S.journal.filter(x => x !== e); if (res.decale) S.journal.forEach(x => { if (x.row != null && x.row > r0) x.row--; }); }
-      } else S.journal = S.journal.filter(x => x !== e);
-    }
-    if (res && !res.ok && ERREURS_PASSAGERES.includes(res.error)) throw new Error(res.message || 'Script momentanément indisponible');
-  } catch (err) {
-    S.lastErr = { msg: String(err && err.message || err), quand: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) };
-    // Un élément « à venir » qui échoue ne bloque plus les autres envois : il passe en fin de file.
-    op.essais = (op.essais || 0) + 1;
-    // Tous les envois du même élément passent ensemble en fin de file, pour garder leur ordre.
-    if (op.op.startsWith('av-') && op.essais >= 2 && S.queue.some(o => o.id !== op.id)) { const lot = S.queue.filter(o => o.id === op.id); S.queue = S.queue.filter(o => o.id !== op.id).concat(lot); sauver(); S.busy = false; setTimeout(pomper, 300); return; }
-    S.busy = false; setSync('off'); clearTimeout(S.reessai); S.reessai = setTimeout(pomper, [2000, 4000, 8000][op.essais - 1] || 15000); return;
-  }
-  S.queue.shift(); S.gen = (S.gen || 0) + 1; S.envoye = true;
-  if (e && !S.queue.some(o => o.id === e.id)) e.pending = false;
-  if (x && !S.queue.some(o => o.id === x.id)) x.pending = false;
-  S.busy = false;
-  if (!res.ok) {
-    if (res.error === 'CLE') { sauver(); return verrouiller(res.message); }
-    const vieux = /Action inconnue/.test(res.message || '');
-    // Une dépense refusée n'est plus perdue : elle est gardée de côté, à renvoyer ou supprimer depuis « Envois » (P3).
-    const garde = op.op === 'add' && e;
-    if (garde) { const rj = LS.get('rejets', []); rj.push(Object.assign(pick(garde), { date: garde.date || null, msg: res.message || 'erreur', quand: new Date().toLocaleDateString('fr-FR') })); LS.set('rejets', rj); S.journal = S.journal.filter(z => z !== garde); }
-    if (garde) toast('Pas enregistré : ' + (res.message || 'erreur') + '. Gardé de côté dans Réglages › Envois', 'VOIR', () => { S.form = { mode: 'file', arm: false }; rendreForm(); ouvrirSheet(); });
-    else toast(vieux ? "Pas enregistré : ton Apps Script n'est pas à jour (Gérer les déploiements > Nouvelle version)" : 'Pas enregistré dans le fichier : ' + (res.message || 'erreur'));
-    sauver(); rendre(true); pomper(); return;
-  }
-  sauver(); rendre(true); pomper();
+  } catch (err) { erreurGlobale = String(err && err.message || err); }
+  S.busy = false; S.enVol = null;
+  if (lotRefuse) { sauver(); return verrouiller(lotRefuse.message); }
+  // Applique les réponses dans l'ordre du lot (dont les décalages de lignes des suppressions).
+  let k = 0, cle = null;
+  ops.forEach((op, i) => {
+    const p = preps[i];
+    if (!S.queue.includes(op)) return; // abandonné pendant l'envoi
+    if (p.local) return terminer(op, p, p.local);
+    if (erreurGlobale) return essaiRate(op, erreurGlobale);
+    const res = reps[k++];
+    if (!res) return; // repli « un par un » : pas encore envoyé, il repart tout de suite
+    if (!res.ok && ERREURS_PASSAGERES.includes(res.error)) return essaiRate(op, res.message || 'Script momentanément indisponible');
+    if (!res.ok && res.error === 'CLE') { cle = res; return; }
+    op.err = null; terminer(op, p, res);
+  });
+  sauver();
+  if (cle) return verrouiller(cle.message);
+  setSync(S.queue.some(o => o.essais) ? 'off' : 'sync');
+  rendre(true);
+  if (S.form && S.form.mode === 'file') rendreFile();
+  pomper();
 }
 
 /* ================= CALCULS ================= */
@@ -1167,7 +1259,7 @@ function rendre(silencieux) {
   const st = statut(S.y, S.m);
   $('#mlabel').innerHTML = esc(moisLabel(S.y, S.m).toUpperCase()) + '<small>' + (st === 'cours' ? 'EN COURS' : st === 'passe' ? 'TERMINÉ' : 'PRÉVISION') + '</small>';
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.act === 'tab:' + S.tab));
-  { const hp = $('#hprog'); if (hp) { hp.hidden = !(on('jeu') || on('defi') || on('series') || on('bilan')); try { majBadgeProgres(on('jeu') && S.data ? etatJeu() : null); } catch (e) {} } }
+  { const hp = $('#hprog'), hd = $('#hdefis'); if (hd) hd.hidden = !(on('jeu') || on('defi') || on('series') || on('bilan')); if (hp) { hp.hidden = !(on('jeu') || on('defi') || on('series') || on('bilan')); try { majBadgeProgres(on('jeu') && S.data ? etatJeu() : null); } catch (e) {} } }
   document.body.classList.toggle('discret', !!LS.get('discret', false));
   const v = $('#view');
   if (!S.data) { v.innerHTML = '<div class="empty">Chargement de ton fichier…</div>'; return; }
@@ -1186,7 +1278,7 @@ function rendre(silencieux) {
 }
 
 function jaugeSVG(b) {
-  const sk = on('jeu') ? LS.get('skin', 'classique') : 'classique';
+  const sk = cos('skin'); // revient à « classique » si la jauge n'est plus débloquée
   if (sk !== 'classique') {
     const c0 = b.restant < 0 || b.frac < 0.15 ? 'var(--bad)' : b.frac < 0.35 ? 'var(--warn)' : 'var(--ok)';
     const r = skinSVG(sk, b.frac, c0, b.st === 'cours' && on('reperes') ? 1 - now.getDate() / dim(S.y, S.m) : null);
@@ -1331,7 +1423,7 @@ function cartePointBas() {
     <div style="display:flex;gap:6px;margin-top:14px">
       <div style="position:relative;width:40px;height:${H}px;flex-shrink:0;font-size:9px;color:var(--ink3);text-align:right">${gr.map(t => `<span style="position:absolute;right:0;top:${(Y(t) / H * 100).toFixed(1)}%;transform:translateY(-50%);white-space:nowrap" class="${t < 0 ? 'c-bad' : ''}">${kEu(t)} €</span>`).join('')}</div>
       <div class="pbg" style="flex:1;min-width:0;height:${H}px">
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px" preserveAspectRatio="none" role="img" aria-label="Solde du mois : estimé jusqu'à aujourd'hui, prévu ensuite">
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px" preserveAspectRatio="none" role="img" aria-label="Solde du mois : calculé jusqu'à aujourd'hui, prévu ensuite">
           <defs><linearGradient id="pbgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${bas.s < 0 ? 'var(--bad)' : 'var(--ok)'}" stop-opacity=".24"/><stop offset="1" stop-color="${bas.s < 0 ? 'var(--bad)' : 'var(--ok)'}" stop-opacity="0"/></linearGradient></defs>
           ${gr.map(t => `<line x1="0" x2="${W}" y1="${Y(t)}" y2="${Y(t)}" stroke="${t === 0 && mn < 0 ? 'var(--bad)' : 'var(--rule)'}" stroke-opacity="${t === 0 ? 1 : .4}" ${t === 0 ? 'stroke-dasharray="4 3"' : ''} stroke-width="1" vector-effect="non-scaling-stroke"/>`).join('')}
           ${ticks.map(({ p, i }) => `<line x1="${X(i)}" x2="${X(i)}" y1="0" y2="${H - PB}" stroke="var(--rule)" stroke-opacity="${p.j === 1 ? .8 : .3}" stroke-width="1" ${p.j === 1 ? '' : 'stroke-dasharray="2 3"'} vector-effect="non-scaling-stroke"/>`).join('')}
@@ -1349,7 +1441,7 @@ function cartePointBas() {
       </div>
     </div>
     <div class="pbs" style="position:relative;height:14px;margin:6px 0 0 46px">${ticks.filter(({ i }, k, A) => k === 0 || (X(i) - X(A[k - 1].i)) / W > 0.17).map(({ p, i }) => `<span style="position:absolute;left:${pct(i)};transform:translateX(${X(i) / W < 0.04 ? '0' : X(i) / W > 0.92 ? '-100%' : '-50%'});white-space:nowrap;${p.j === 1 ? 'font-weight:600;color:var(--ink2)' : ''}">${p.j === 1 ? '1er ' : p.j + ' '}${MC[p.m - 1]}</span>`).join('')}</div>
-    <div class="pbleg"><span><i></i>estimé</span><span><i style="background:repeating-linear-gradient(90deg,var(--ink2) 0 4px,transparent 4px 7px)"></i>prévu</span><span><i style="width:2px;height:10px;background:var(--acc,var(--ok))"></i>aujourd'hui</span><span class="c-ok">● entrée</span><span class="c-bad">● sortie</span></div></button>`;
+    <div class="pbleg"><span><i></i>calculé</span><span><i style="background:repeating-linear-gradient(90deg,var(--ink2) 0 4px,transparent 4px 7px)"></i>prévu</span><span><i style="width:2px;height:10px;background:var(--acc,var(--ok))"></i>aujourd'hui</span><span class="c-ok">● entrée</span><span class="c-bad">● sortie</span></div></button>`;
 }
 function alerteVersion() {
   if (IN_GAS || !S.data || versionAuMoins(S.data.apiVersion, API_ATTENDUE)) return '';
@@ -1360,7 +1452,7 @@ const INFOS = {
   fin: ['FIN DE MOIS', "Ce qu'il te restera le dernier jour <b>si tu dépenses exactement tes budgets</b>, pas plus, et en comptant tes achats prévus. Si tu dépenses moins que tes budgets, tu finiras plus haut ; si tu les dépasses, plus bas."],
   prelever: ['À PRÉLEVER', "Les charges et abonnements de l'échéancier qui ne sont pas encore passés ce mois-ci, plus tes achats prévus. C'est l'argent déjà « réservé »."],
   nd: ['NON DÉPENSÉ', "Depuis janvier : revenus − dépenses. Comprend l'argent resté sur ton compte et celui parti en épargne."],
-  courbe: ['SOLDE PRÉVU', "Ton solde en banque jour par jour. Trait plein : estimé jusqu'à aujourd'hui. Pointillés : la suite, si tu dépenses tes budgets au rythme prévu. Points verts : entrées de l'échéancier (salaire…). Points rouges : sorties (loyer, abonnements, virements…) et achats prévus. Une dépense saisie dans ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue) ; un dépassement de budget la fait descendre. Sous 0 € : découvert."] };
+  courbe: ['SOLDE PRÉVU', "Ton argent (banque + espèces) jour par jour. Trait plein : calculé d'après tes saisies et tes prélèvements jusqu'à aujourd'hui (ce n'est pas ton relevé bancaire). Pointillés : la suite, si tu dépenses tes budgets au rythme prévu. Points verts : entrées de l'échéancier (salaire…). Points rouges : sorties (loyer, abonnements, virements…) et achats prévus. Une dépense saisie dans ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue) ; un dépassement de budget la fait descendre. Sous 0 € : découvert."] };
 const qi = k => LS.get('aidesOff', false) ? '' : `<span class="qi" data-act="info" data-k="${k}" role="button" aria-label="Explication">?</span>`;
 // Détail des écritures pas encore envoyées au fichier, avec la dernière erreur
 function descOp(o) {
@@ -1368,6 +1460,14 @@ function descOp(o) {
   const nom = { add: 'Ajout', update: 'Modification', delete: 'Suppression', 'ech-save': 'Échéancier', 'ech-del': 'Échéancier (suppression)', 'av-save': 'Achat à venir', 'av-del': 'Achat à venir (suppression)', 'av-paye': 'Achat à venir payé', call: 'Réglage' }[o.op] || o.op;
   const d = e ? `${e.lib} · ${e2(e.montant)} €` : a ? `${a.lib} · ${e2(a.montant)} €` : x ? `${x.lib} · ${e2(x.montant || 0)} €` : o.action || '';
   return nom + (d ? ' · ' + d : '');
+}
+// Statut individuel d'un envoi (F1) : chacun a ses propres essais, on voit lequel bloque.
+function statutOp(o) {
+  if (enVol(o)) return 'envoi en cours…';
+  const att = S.queue.slice(0, S.queue.indexOf(o)).some(p => estBarriere(p) || estBarriere(o) || clesOp(p).some(c => clesOp(o).includes(c)));
+  const s = o.prochain > Date.now() ? Math.ceil((o.prochain - Date.now()) / 1000) : 0;
+  return (o.err ? 'erreur : ' + o.err + (o.essais ? ' (' + o.essais + ' essai' + (o.essais > 1 ? 's' : '') + ')' : '') + ' · ' : '')
+    + (s ? 'nouvel essai dans ' + s + ' s' : att ? "attend l'envoi précédent du même élément" : 'en attente');
 }
 // Dépenses refusées par le fichier (mois ou catégorie inconnus…) : gardées sur le téléphone jusqu'à ce que tu décides.
 function rejetsHtml() {
@@ -1379,18 +1479,18 @@ function rejetsHtml() {
 function rejetRenvoyer(i) {
   const rj = LS.get('rejets', []), r = rj[i]; if (!r) return;
   rj.splice(i, 1); LS.set('rejets', rj);
-  const p = parseMois(r.mois), e = { id: uid(), row: null, date: r.date, mois: r.mois, lib: r.lib, cat: r.cat, montant: r.montant, y: p ? p.y : null, m: p ? p.m : null, srv: null, pending: true, nw: true };
+  const p = parseMois(r.mois), e = { id: uid(), row: null, date: r.date, mois: r.mois, lib: r.lib, cat: r.cat, montant: r.montant, especes: !!r.especes, y: p ? p.y : null, m: p ? p.m : null, srv: null, pending: true, nw: true };
   S.journal.push(e); memo = new Map(); enfiler({ op: 'add', id: e.id }); rendre(true);
 }
 function rendreFile() {
   const er = S.lastErr;
-  $('#sheetIn').innerHTML = enteteSheet('ENVOIS EN ATTENTE', 'reglages') + `<div class="note" style="display:block;margin-top:10px">Ces modifications sont enregistrées sur ton téléphone mais pas encore dans ton fichier Google Sheets. L'appli réessaie toute seule (après 2 s, 4 s, 8 s, puis toutes les 15 s).</div>
-    <div class="ticket" style="margin-top:8px">${S.queue.map((o, i) => `<div class="tl"><span style="white-space:normal">${i + 1}. ${esc(descOp(o))}</span></div>`).join('') || '<div class="tl"><span>Rien en attente ✓</span></div>'}</div>
+  $('#sheetIn').innerHTML = enteteSheet('ENVOIS EN ATTENTE', 'reglages') + `<div class="note" style="display:block;margin-top:10px">Ces modifications sont enregistrées sur ton téléphone mais pas encore dans ton fichier Google Sheets. Chaque envoi part de son côté : s'il bloque, les autres continuent. L'appli le réessaie tout seul (après 2 s, 4 s, 8 s, puis toutes les 15 s).</div>
+    <div class="ticket" style="margin-top:8px">${S.queue.map((o, i) => `<div class="tl"><span style="white-space:normal">${i + 1}. ${esc(descOp(o))}<br><span class="${o.err ? 'c-bad' : 'muted'}" style="font-size:12px">${esc(statutOp(o))}</span></span></div>
+      ${enVol(o) ? '' : `<div style="display:flex;gap:8px;margin:4px 0 8px"><button class="opt ${S.form.arm === o ? 'armed' : ''}" data-act="file-drop" data-i="${i}">${S.form.arm === o ? 'TOUCHE ENCORE : ABANDONNER' : 'ABANDONNER CET ENVOI'}</button></div>`}`).join('') || '<div class="tl"><span>Rien en attente ✓</span></div>'}</div>
     ${rejetsHtml()}
     ${er ? `<div class="alert" style="margin-top:10px;cursor:default">Dernière erreur (${esc(er.quand)}) : ${esc(er.msg)}</div>` : ''}
     <div class="note" style="display:block;margin-top:8px">Si ça bloque : ouvre le lien de ton script (/exec) dans un navigateur. Il doit afficher « script … en ligne ✓ ». Sinon, dans Apps Script, lance une fonction une fois (bouton ▶) pour redonner l'autorisation, puis Déployer › Gérer les déploiements › Nouvelle version.</div>
-    <button class="go" data-act="file-retry" style="margin-top:10px">RÉESSAYER MAINTENANT</button>
-    ${S.queue.length ? `<button class="danger ${S.form.arm ? 'armed' : ''}" data-act="file-drop">${S.form.arm ? 'TOUCHE ENCORE : ABANDONNER LE 1ER ENVOI' : 'ABANDONNER LE 1ER ENVOI (bloquant)'}</button>` : ''}`;
+    <button class="go" data-act="file-retry" style="margin-top:10px">RÉESSAYER MAINTENANT</button>`;
 }
 function rendreInfo() { const [t, x] = INFOS[S.form.k] || ['', '']; $('#sheetIn').innerHTML = enteteSheet(t, null) + `<p style="font-size:14px;line-height:1.55;margin:12px 0 6px">${x}</p><button class="go" data-act="close">COMPRIS</button>`; }
 function lignePJ() {
@@ -1400,8 +1500,8 @@ function lignePJ() {
 }
 // Envois bloqués (3 essais ratés ou plus) ou refusés : un bandeau visible sur l'accueil, qui ouvre « Envois » (E2).
 function alerteEnvois() {
-  const o = S.queue[0], rj = LS.get('rejets', []).length;
-  if (o && (o.essais || 0) >= 3) return `<div class="alert"><button data-act="file" style="display:block;width:100%;text-align:left"><b style="font-weight:600">⚠ ${S.queue.length} ENVOI${S.queue.length > 1 ? 'S' : ''} EN ATTENTE</b> : ton fichier ne répond pas. L'appli réessaie toute seule ; touche pour voir le détail.</button></div>`;
+  const o = S.queue.find(q => (q.essais || 0) >= 3), rj = LS.get('rejets', []).length;
+  if (o) return `<div class="alert"><button data-act="file" style="display:block;width:100%;text-align:left"><b style="font-weight:600">⚠ ${S.queue.length} ENVOI${S.queue.length > 1 ? 'S' : ''} EN ATTENTE</b> : ton fichier ne répond pas. L'appli réessaie toute seule ; touche pour voir le détail.</button></div>`;
   if (rj) return `<div class="alert"><button data-act="file" style="display:block;width:100%;text-align:left"><b style="font-weight:600">⚠ ${rj} DÉPENSE${rj > 1 ? 'S' : ''} REFUSÉE${rj > 1 ? 'S' : ''}</b> par ton fichier : touche pour la renvoyer ou la supprimer.</button></div>`;
   return '';
 }
@@ -1413,7 +1513,7 @@ function vueAccueil() {
   if (b.st === 'cours') h += banniereEv();
   h += `<div class="gauge">${b.st === 'cours' ? blocMascotte() + blocVitrine() : ''}<button data-act="jmode" style="display:block;width:100%" aria-label="Basculer argent restant / solde">${jaugeSVG(b)}
     <div class="big ${val != null && val < 0 ? 'c-bad' : ''}" id="big" data-v="${val == null ? 0 : val}">${val == null ? '—' : e0(val)}</div>
-    <div class="lbl">${solde ? (sc == null ? 'SOLDE PAS ENCORE NOTÉ · ⚙ › MON SOLDE' : 'ARGENT DISPONIBLE ESTIMÉ' + (b.st === 'cours' ? " AUJOURD'HUI" : '') + '<small class="lblsub">banque + espèces</small>') : 'ARGENT RESTANT'} <span style="opacity:.6">⇄</span>${solde ? '' : ' ' + qi('restant')}${solde ? '' : '<small class="lblsub">après les charges et dépenses du mois</small>'}</div></button>
+    <div class="lbl">${solde ? (sc == null ? 'SOLDE PAS ENCORE NOTÉ · ⚙ › MON SOLDE' : 'ARGENT DISPONIBLE ESTIMÉ' + (b.st === 'cours' ? " AUJOURD'HUI" + sousTitreEspeces(sc) : '<small class="lblsub">banque + espèces</small>')) : 'ARGENT RESTANT'} <span style="opacity:.6">⇄</span>${solde ? '' : ' ' + qi('restant')}${solde ? '' : '<small class="lblsub">après les charges et dépenses du mois</small>'}</div></button>
     ${b.st === 'cours' && !solde && on('pj') ? lignePJ() : ''}
     <p class="phrase">${phraseRythme(b)}</p>`;
   const pills = [];
@@ -1486,7 +1586,7 @@ function htmlListe() {
   const rows = l.map(({ e, c }) => {
     const t = c ? c.type : '';
     if (t === 'Revenu' || t === 'Retrait') rev += e.montant; else dep += e.montant;
-    return `<button class="jl ${e.pending ? 'pend' : ''} ${e.nw ? 'nw' : ''}" data-act="edit" data-id="${e.id}"><div class="l"><div>${esc(e.lib || e.cat)}</div><div class="c">${S.filtre.q ? esc(MC[e.m - 1]) + ' · ' : ''}${esc(e.cat)}${e.date ? ' · le ' + (+e.date.slice(8)) + '/' + esc(e.date.slice(5, 7)) : ''}${c ? '' : ' · catégorie inconnue'}${e.pending ? ' · envoi…' : ''}</div></div>
+    return `<button class="jl ${e.pending ? 'pend' : ''} ${e.nw ? 'nw' : ''}" data-act="edit" data-id="${e.id}"><div class="l"><div>${esc(e.lib || e.cat)}</div><div class="c">${S.filtre.q ? esc(MC[e.m - 1]) + ' · ' : ''}${esc(e.cat)}${e.date ? ' · le ' + (+e.date.slice(8)) + '/' + esc(e.date.slice(5, 7)) : ''}${e.especes ? ' · <span class="espm">💶 espèces</span>' : ''}${c ? '' : ' · catégorie inconnue'}${e.pending ? ' · envoi…' : ''}</div></div>
       ${montantLigne(t, e.montant)}</button>`;
   }).join('');
   return `<div class="sec" style="margin-top:14px"><span>${l.length} LIGNE${l.length > 1 ? 'S' : ''}${S.filtre.q ? ' EN ' + S.y : ''}</span><span>−${e0(dep)}${rev ? ' · +' + e0(rev) : ''}</span></div>` + rows;
@@ -1532,8 +1632,8 @@ function suggestions(cat) {
 function ouvrirSaisie(e, dup) {
   const t = e ? typeDe(e.cat) : 'Dépense';
   const ym = statut(S.y, S.m) === 'futur' ? { y: now.getFullYear(), m: now.getMonth() + 1 } : { y: S.y, m: S.m };
-  S.form = e && !dup ? { mode: 'edit', id: e.id, row: e.row, type: t, montant: String(e.montant).replace('.', ','), cat: e.cat, lib: e.lib === e.cat ? '' : e.lib, y: e.y || S.y, m: e.m || S.m, date: e.date || null, all: false, arm: false, jour: null }
-    : { mode: 'add', type: t, montant: e ? String(e.montant).replace('.', ',') : '', cat: e ? e.cat : null, lib: e && e.lib !== e.cat ? e.lib : '', y: ym.y, m: ym.m, date: dateDefaut(ym.y, ym.m), all: false, arm: false, jour: null };
+  S.form = e && !dup ? { mode: 'edit', id: e.id, row: e.row, type: t, montant: String(e.montant).replace('.', ','), cat: e.cat, lib: e.lib === e.cat ? '' : e.lib, y: e.y || S.y, m: e.m || S.m, date: e.date || null, all: false, arm: false, jour: null, especes: !!e.especes }
+    : { mode: 'add', type: t, montant: e ? String(e.montant).replace('.', ',') : '', cat: e ? e.cat : null, lib: e && e.lib !== e.cat ? e.lib : '', y: ym.y, m: ym.m, date: dateDefaut(ym.y, ym.m), all: false, arm: false, jour: null, especes: !!(e && e.especes) };
   if (!LS.get('tutoVu', false)) { S.retourSaisie = S.form; S.form = { mode: 'tuto' }; }
   rendreForm(); ouvrirSheet();
 }
@@ -1544,7 +1644,8 @@ const TUTO = [
   ['🐷', 'ÉPARGNE', "Uniquement l'argent que tu <b>mets de côté</b> : versement sur un livret, PEA, assurance vie, crypto… On ne retire jamais depuis cet onglet. C'est ce qui remplit ton objectif d'épargne. Un transfert d'un placement à un autre (livret A → PEA) ne se saisit pas : ça se passe dans ton suivi de patrimoine."],
   ['🔁', 'PRÉLÈVEMENTS RÉGULIERS', "Loyer, abonnements, salaire, virement d'épargne automatique : mets-les une fois dans l'onglet <b>Prévu</b>. Ne les saisis pas en plus ici, sinon ils comptent deux fois."],
   ['👥', "PAYÉ POUR D'AUTRES", "Dans une dépense, touche « Payé pour d'autres aussi » : ta part va dans ton budget, le reste dans « On te doit » jusqu'au remboursement."],
-  ['🏦', 'MON SOLDE (BANQUE + ESPÈCES)', "Quand tu veux, pas seulement en début de mois (⚙ › Mon solde) : tape ce qu'il y a sur ton compte <b>et</b> le liquide que tu as en poche. Un retrait au distributeur ne se saisit pas : l'argent passe juste de la banque à ta poche. Ce sont les achats payés en liquide que tu saisis, comme les autres. Si tu oublies les espèces, l'appli croira qu'il te manque de l'argent."],
+  ['🏦', 'MON SOLDE (BANQUE + ESPÈCES)', "Quand tu veux, pas seulement en début de mois (⚙ › Mon solde) : tape ce qu'il y a sur ton compte <b>et</b> le liquide que tu as en poche. Ensuite, l'appli suit les deux toute seule. Si tu oublies les espèces, elle croira qu'il te manque de l'argent."],
+  ['💶', 'ESPÈCES ET DISTRIBUTEUR', "Un achat payé en liquide se saisit comme les autres : active juste <b>« Payé en espèces »</b>, tes espèces baissent d'autant. Un <b>retrait au distributeur</b> n'est pas une dépense : touche « 🏧 un retrait ? » (ou ⚙ › Mon solde › Retrait d'espèces), l'argent passe de la banque à ta poche, ton total ne bouge pas."],
   ['📅', 'DATE ET ACHAT À VENIR', "La date est celle du jour par défaut. Oublié une dépense hier ? Recule-la avec ‹. Une place d'avant-première, un achat déjà prévu ? Avance la date après aujourd'hui (ou le mois avec ›) : la ligne devient un achat à venir, que tu valideras le jour venu."]];
 function rendreTuto() {
   $('#sheetIn').innerHTML = enteteSheet('COMMENT SAISIR', null) + `<div style="margin-top:8px">${TUTO.map(t => `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--rule)"><span style="font-size:24px;flex:none;width:34px;text-align:center">${t[0]}</span><div style="flex:1;min-width:0"><div style="font-family:var(--mono);font-size:12px;letter-spacing:1.4px;font-weight:600;margin-bottom:3px">${t[1]}</div><div style="font-size:13px;line-height:1.45;color:var(--ink2)">${t[2]}</div></div></div>`).join('')}</div>
@@ -1567,7 +1668,7 @@ function rendreForm() {
   }
   const sug = f.cat ? suggestions(f.cat) : [];
   $('#sheetIn').innerHTML = `<div class="grab"></div>
-    <div class="shead"><span>${f.mode === 'edit' ? 'MODIFIER LA LIGNE' : futur ? (f.type === 'Revenu' ? 'REVENU PRÉVU' : f.type === 'Épargne' ? 'ÉPARGNE PRÉVUE' : 'ACHAT PRÉVU') : 'NOUVELLE LIGNE'} <button class="lnk" data-act="tuto" style="margin-left:6px">? AIDE</button></span><button class="ibtn" data-act="close" aria-label="Fermer">${ico.x}</button></div>
+    <div class="shead"><span>${f.mode === 'edit' ? 'MODIFIER LA LIGNE' : futur ? (f.type === 'Revenu' ? 'REVENU PRÉVU' : f.type === 'Épargne' ? 'ÉPARGNE PRÉVUE' : 'ACHAT PRÉVU') : 'NOUVELLE LIGNE'} ${LS.get('aidesOff', false) ? '' : `<button class="lnk" data-act="tuto" style="margin-left:6px">? AIDE</button>`}</span><button class="ibtn" data-act="close" aria-label="Fermer">${ico.x}</button></div>
     <div class="seg">${Object.keys(TYPES).map(t => `<button class="${f.type === t ? 'on' : ''}" data-act="type" data-t="${t}">${t.toUpperCase()}</button>`).join('')}</div>
     <div class="amt ${montantNum() ? '' : 'zero'}" id="amt">${f.montant ? esc(f.montant) : '0'} €</div>
     <div class="mrow"><button class="mbtn" data-act="fm:-1" aria-label="Mois précédent">‹</button><span>${moisLabel(f.y, f.m).toUpperCase()}</span><button class="mbtn" data-act="fm:1" aria-label="Mois suivant">›</button></div>
@@ -1575,13 +1676,14 @@ function rendreForm() {
     ${/^Écart/.test(f.lib || '') ? `<div class="mrow" style="margin-top:2px"><button class="chip" data-act="sgn">± CHANGER LE SIGNE</button></div>` : ''}
     ${moisFutur && f.mode === 'add' ? `<div class="mrow" style="margin-top:2px"><button class="mbtn" data-act="fj:-1" aria-label="Jour précédent">‹</button><span>${f.jour ? 'LE ' + f.jour : 'JOUR NON PRÉCISÉ'}</span><button class="mbtn" data-act="fj:1" aria-label="Jour suivant">›</button></div>` : ''}
     <div class="hint" id="hint"></div>
+    ${f.type === 'Dépense' && !futur ? `<div class="mrow" style="margin:-4px 0 6px;flex-wrap:wrap"><button class="chip ${f.especes ? 'on' : ''}" data-act="esp" aria-pressed="${f.especes ? 'true' : 'false'}">💶 ${f.especes ? '✓ ' : ''}PAYÉ EN ESPÈCES</button>${f.mode === 'add' ? '<button class="lnk" data-act="ret-go">🏧 un retrait ?</button>' : ''}</div><div class="note" id="esphint" style="display:${f.especes ? 'block' : 'none'};text-align:center;margin:-2px 0 8px"></div>` : ''}
     ${f.type === 'Dépense' && f.mode === 'add' && !futur && on('avances') ? `<div class="mrow" style="margin:-4px 0 6px"><button class="chip ${f.partage ? 'on' : ''}" data-act="partage">👥 PAYÉ POUR D'AUTRES AUSSI</button></div>${f.partage ? `<div class="part">
       <div class="chips" style="margin:0">${[...new Set([...nomsConnus(), ...(f.noms || [])])].map(n => `<button class="chip ${(f.noms || []).includes(n) ? 'on' : ''}" data-act="pnom" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
       <div style="display:flex;gap:6px"><input class="libin" id="pnouv" placeholder="Ajouter un prénom" autocomplete="off" maxlength="30" style="margin:8px 0"><button class="chip" data-act="pajout" style="margin:8px 0">+</button></div>
       <div style="display:flex;align-items:center;gap:8px"><span class="muted" style="font-size:13px;white-space:nowrap">Ma part</span><input class="libin" id="ppart" inputmode="decimal" placeholder="auto" value="${esc(f.part || '')}" style="margin:0"></div>
       <div class="note" id="presume" style="display:block"></div></div>` : ''}` : ''}
     <div class="chips">${chips}</div>${tout}
-    ${f.type === 'Épargne' && f.mode === 'add' ? `<div class="note" style="display:block;margin:-2px 0 8px">Ici, uniquement l'argent que tu <b>mets de côté</b> (livrets, PEA, assurance vie, crypto…).</div>` : ''}
+    ${f.type === 'Épargne' && f.mode === 'add' && !LS.get('aidesOff', false) ? `<div class="note" style="display:block;margin:-2px 0 8px">Ici, uniquement l'argent que tu <b>mets de côté</b> (livrets, PEA, assurance vie, crypto…).</div>` : ''}
     <input class="libin" id="lib" placeholder="Libellé (facultatif)" value="${esc(f.lib)}" autocomplete="off" maxlength="80">
     ${sug.length ? `<div class="chips" style="margin:-4px 0 8px">${sug.map(s => `<button class="chip sug" data-act="libsug" data-l="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : ''}
     <div class="pad">${['1','2','3','4','5','6','7','8','9',',','0','⌫'].map(k => `<button data-k="${k}">${k === '⌫' ? ico.back : k}</button>`).join('')}</div>
@@ -1610,6 +1712,7 @@ function majHint() {
   const f = S.form, h = $('#hint'), a = $('#amt'); if (!f || !h) return;
   a.textContent = (f.montant || '0') + ' €'; a.classList.toggle('zero', !montantNum());
   $('#ferr').textContent = '';
+  majEspHint();
   if (estPrevu(f) && f.mode === 'add') { h.innerHTML = '<span class="muted">Rangé dans « À venir » : tu le valideras le jour venu, sur l\'accueil</span>'; return; }
   if (!f.cat) { h.innerHTML = '<span class="muted">Choisis une catégorie</span>'; return; }
   const pa = partage(), z = $('#presume');
@@ -1663,7 +1766,7 @@ function enregistrer() {
     const objet = (f.lib || '').trim() || f.cat, nouv = [];
     if (pa.moi > 0) nouv.push({ lib, cat: f.cat, montant: pa.moi });
     if (pa.chacun > 0) f.noms.forEach(n => nouv.push({ lib: n + ' · ' + objet, cat: CAT_AV, montant: pa.chacun }));
-    const es = nouv.map(x => ({ id: uid(), row: null, date: f.date || auj(), mois, lib: x.lib, cat: x.cat, montant: x.montant, y: f.y, m: f.m, srv: null, pending: true, nw: true }));
+    const es = nouv.map(x => ({ id: uid(), row: null, date: f.date || auj(), mois, lib: x.lib, cat: x.cat, montant: x.montant, especes: !!f.especes, y: f.y, m: f.m, srv: null, pending: true, nw: true }));
     es.forEach(e => S.journal.push(e)); memo = new Map(); if (casseSerie(f.cat)) noterDepenseDuJour(f.date);
     fermer(); S.y = f.y; S.m = f.m; rendre(true);
     toast(`Ta part ${e2(pa.moi)} € · on te doit ${e2(pa.chacun * pa.n)} €`, 'ANNULER', () => es.forEach(e => supprimer(e)));
@@ -1671,7 +1774,7 @@ function enregistrer() {
   }
   if (f.mode === 'add') {
     const avant = f.type === 'Dépense' ? budgetDe(f.cat, f.y, f.m) : null;
-    const e = { id: uid(), row: null, date: f.date || auj(), mois, lib, cat: f.cat, montant: n, y: f.y, m: f.m, srv: null, pending: true, nw: true };
+    const e = { id: uid(), row: null, date: f.date || auj(), mois, lib, cat: f.cat, montant: n, especes: f.type === 'Dépense' && !!f.especes, y: f.y, m: f.m, srv: null, pending: true, nw: true };
     const use = LS.get('usage', {}); use[f.cat] = (use[f.cat] || 0) + 1; LS.set('usage', use);
     S.journal.push(e); memo = new Map();
     if (casseSerie(e.cat) && e.y === now.getFullYear() && e.m === now.getMonth() + 1) noterDepenseDuJour(e.date);
@@ -1681,14 +1784,14 @@ function enregistrer() {
     toast(b ? `${e.cat} : ${b.reste >= 0 ? 'il te reste ' + e0(b.reste) : 'dépassé de ' + e0(-b.reste)}` : 'Enregistré', 'ANNULER', () => supprimer(e));
     enfiler({ op: 'add', id: e.id });
   } else {
-    const e = trouver(f.id) || (f.row != null && S.journal.find(x => x.row === f.row && !x.deleted)); if (!e) { fermer(); toast('Ligne introuvable, réessaie'); return; }    Object.assign(e, { mois, lib, cat: f.cat, montant: n, y: f.y, m: f.m, date: f.date || e.date || null, pending: true });
+    const e = trouver(f.id) || (f.row != null && S.journal.find(x => x.row === f.row && !x.deleted)); if (!e) { fermer(); toast('Ligne introuvable, réessaie'); return; }    Object.assign(e, { mois, lib, cat: f.cat, montant: n, y: f.y, m: f.m, date: f.date || e.date || null, especes: f.type === 'Dépense' && !!f.especes, pending: true });
     fermer(); rendre(true); toast('Ligne modifiée'); enfiler({ op: 'update', id: e.id });
   }
 }
 function supprimer(e0) {
   const e = trouver(e0.id) || (e0.row != null && S.journal.find(x => x.row === e0.row && !x.deleted)); if (!e) return;
   const i = S.queue.findIndex(o => o.id === e.id && o.op === 'add');
-  if (i > 0 || (i === 0 && !S.busy)) { S.queue.splice(i, 1); S.journal = S.journal.filter(x => x !== e); sauver(); rendre(true); return; }
+  if (i >= 0 && !enVol(S.queue[i])) { S.queue.splice(i, 1); S.journal = S.journal.filter(x => x !== e); sauver(); rendre(true); return; }
   e.deleted = true; e.pending = true; rendre(true); enfiler({ op: 'delete', id: e.id });
 }
 
@@ -1907,10 +2010,75 @@ function signe(type) { return type === 'Revenu' || type === 'Retrait' ? 1 : -1; 
 // Solde au 1er janvier : celui saisi pour l'année, sinon la fin calculée de l'année d'avant (au plus 2 ans en arrière) (C7).
 function soldeDepart(y, k) { const s = S.data && S.data.soldes ? S.data.soldes[String(y)] : null; if (typeof s === 'number' && Math.abs(s) > 1) return s; return (k || 0) < 2 ? soldeFin(y - 1, 12, (k || 0) + 1) : null; }
 function ouvrirSolde() {
-  const c = S.data.controle || {};
-  S.form = { mode: 'solde', y: now.getFullYear(), m: now.getMonth() + 1, banque: '', especes: c.especes ? txtNum(c.especes) : '', dep: '', neg: false, salDeja: false };
+  const es = etatEspeces();
+  S.form = { mode: 'solde', y: now.getFullYear(), m: now.getMonth() + 1, banque: '', especes: es.esp ? txtNum(es.esp) : '', dep: '', neg: false, salDeja: false, ret: false, rm: '', rd: auj() };
   rendreForm();
 }
+/* ---- espèces : ce qui est sur le compte / ce qui est en poche ----
+   Préférence synchronisée « especes » : { depuis: 'aaaa-mm-jj' (jour du dernier contrôle), base: espèces déclarées ce jour-là,
+   deja: espèces payées ce jour-là déjà saisies avant le contrôle (déjà déduites de base), r: [{ d, m }] retraits depuis }.
+   Espèces = base + retraits − dépenses « payé en espèces » datées depuis le contrôle. Banque = total calculé − espèces.
+   Le total (jauge, courbe, prévisions) ne change pas : on ne fait que le découper en deux. */
+function prefEsp() { const p = getPref('especes', null); return p && typeof p === 'object' && !Array.isArray(p) ? p : null; }
+// Montant net payé en espèces (dépenses +, éventuelles rentrées −), lignes datées à partir de « depuis » (ou ce jour-là seulement)
+function sommeEspeces(depuis, seulJour) {
+  const cm = catMap(); let t = 0;
+  S.journal.forEach(e => {
+    if (e.deleted || !e.especes || !e.montant) return;
+    if (seulJour ? e.date !== seulJour : depuis && (!e.date || e.date < depuis)) return;
+    const c = cm[e.cat]; t -= (c ? signe(c.type) : -1) * e.montant;
+  });
+  return Math.round(t * 100) / 100;
+}
+function etatEspeces() {
+  const p = prefEsp(), c = (S.data && S.data.controle) || {};
+  // Sans préférence (contrôle fait avant cette version) : on part des espèces du fichier ; toute ligne « espèces » est forcément plus récente.
+  const base = p && typeof p.base === 'number' ? p.base : (typeof c.especes === 'number' ? c.especes : 0);
+  const depuis = p && p.depuis || null, r = p && Array.isArray(p.r) ? p.r : [];
+  const ret = r.reduce((t, x) => t + (+x.m || 0), 0), dep = sommeEspeces(depuis), deja = p && +p.deja || 0;
+  const v = Math.round((base + ret - dep + deja) * 100) / 100;
+  return { brut: v, esp: Math.max(0, v), neg: v < -0.005, base, ret, dep: Math.round((dep - deja) * 100) / 100, depuis, r };
+}
+// Banque estimée aujourd'hui = total calculé − espèces en poche
+function partageSolde(total) { const es = etatEspeces(); return Object.assign(es, { banque: Math.round((total - es.esp) * 100) / 100 }); }
+const AVERT_ESP = "tu as dépensé plus d'espèces que déclaré : refais un contrôle";
+function sousTitreEspeces(total) {
+  if (total == null) return '<small class="lblsub">banque + espèces</small>';
+  const s = partageSolde(total);
+  return `<small class="lblsub">banque <span class="espv">${e0(s.banque)}</span> · espèces <span class="espv">${e0(s.esp)}</span></small>${s.neg ? `<small class="espw">⚠ ${AVERT_ESP}</small>` : ''}`;
+}
+// Saisie : effet de « Payé en espèces » sur ce qui reste en poche
+function majEspHint() {
+  const f = S.form, z = $('#esphint'); if (!z) return;
+  z.style.display = f.especes ? 'block' : 'none'; if (!f.especes) return;
+  const es = etatEspeces(); let n = montantNum();
+  if (f.mode === 'edit') { const e = trouver(f.id); if (e && e.especes && (!es.depuis || (e.date && e.date >= es.depuis))) n -= e.montant; }
+  const apres = Math.round((es.brut - n) * 100) / 100;
+  z.innerHTML = `Espèces en poche : ${e2(es.esp)} € → <b>${e2(Math.max(0, apres))} €</b>` + (apres < -0.005 ? `<br><span class="c-warn">Plus que ce que tu avais déclaré : refais un contrôle dans ⚙ › Mon solde</span>` : '');
+}
+// Retrait au distributeur : banque −X, espèces +X, total inchangé (ce n'est pas une dépense)
+function okRetrait() {
+  const f = S.form, v = Math.round(numTxt(f.rm) * 100) / 100;
+  if (!(v > 0) || v > 100000) { $('#rerr').textContent = 'Tape le montant retiré'; return; }
+  const es = etatEspeces(), p = Object.assign({}, prefEsp() || { depuis: null, base: es.base }), r = (Array.isArray(p.r) ? p.r : []).slice();
+  r.push({ d: f.rd || auj(), m: v });
+  // Préférence limitée à 8000 caractères : les plus vieux retraits sont fondus dans la base (même total).
+  p.r = r; while (JSON.stringify(p).length > 7000 && p.r.length > 1) { const x = p.r.shift(); p.base = Math.round(((+p.base || 0) + (+x.m || 0)) * 100) / 100; }
+  setPref('especes', p); vibrer();
+  f.ret = false; f.rm = ''; f.rd = auj(); f.especes = txtNum(etatEspeces().esp); // le champ du contrôle suit les espèces à jour
+  rendreSolde(); rendre(true);
+  toast(`Retrait noté : espèces +${e2(v)} €, banque −${e2(v)} €`);
+}
+function supprRetrait(i) {
+  const p = prefEsp(); if (!p || !Array.isArray(p.r) || !p.r[i]) return;
+  const avant = JSON.parse(JSON.stringify(p)), x = p.r[i];
+  const maj = () => { if (S.form && S.form.mode === 'solde') { S.form.especes = txtNum(etatEspeces().esp); rendreSolde(); } rendre(true); };
+  setPref('especes', Object.assign({}, p, { r: p.r.filter((_, k) => k !== i) })); maj();
+  toast('Retrait de ' + e2(x.m) + ' € retiré', 'ANNULER', () => { setPref('especes', avant); maj(); });
+}
+// Un retrait se date au plus tôt le jour du dernier contrôle (avant, il est déjà compté dans les espèces déclarées), et 60 jours en arrière au maximum
+function retraitMin() { const d = etatEspeces().depuis, l = addJ(auj(), -60); return d && d > l ? d : l; }
+const jjmm = iso => iso ? (+iso.slice(8)) + '/' + iso.slice(5, 7) : '';
 // Salaire de l'Échéancier daté du 1er du mois prochain (souvent versé quelques jours avant)
 function salaireDejaLa() {
   const y = now.getFullYear(), m = now.getMonth() + 1, ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
@@ -1945,18 +2113,34 @@ function okSolde() {
   else { appel('solde-ctrl', { mois: 'Janvier', solde: null, especes: esp }); S.data.controle = { mois: 'Janvier', solde: null, especes: esp }; } // l'appli suit tout de suite (E6)
   const hist = LS.get('controles', []);
   hist.unshift({ date: now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }), mois: MC[m - 1] + ' ' + y, ecart: e == null ? 0 : Math.round(e * 100) / 100, solde: Math.round(t * 100) / 100 });
-  LS.set('controles', hist.slice(0, 24)); LS.set('ctrlFait', nowYM()); sauver();
+  LS.set('controles', hist.slice(0, 24)); LS.set('ctrlFait', nowYM());
+  // 3) espèces : les espèces déclarées deviennent la nouvelle base, la liste des retraits repart de zéro
+  const pe = { depuis: auj(), base: Math.round(esp * 100) / 100, r: [] }, dj = sommeEspeces(null, auj()); if (dj) pe.deja = dj;
+  setPref('especes', pe); sauver();
   fermer(); rendre(true);
   toast(e == null || Math.abs(e) <= 5 ? 'Solde noté ✓ L\'appli repart de ' + e0(t) : 'Solde noté : écart de ' + e0(e) + ' absorbé, l\'appli repart de ' + e0(t));
 }
 function rendreSolde() {
   const f = S.form, y = now.getFullYear(), m = now.getMonth() + 1, cal = soldeCalcule(y, m), d = now.getDate(), sal = salaireDejaLa();
-  let h = enteteSheet('MON SOLDE', 'reglages') + `<div class="note" style="display:block;margin-top:10px">Quand tu veux (idéalement le 1er) : tape ce qu'il y a sur ton compte aujourd'hui <b>et le liquide que tu as en poche</b>. L'appli repart du total, c'est tout. Un retrait d'espèces ne se saisit pas : seuls les achats payés en liquide se saisissent.</div>
-    ${cal != null ? `<div class="ticket" style="margin-top:10px"><div class="tl"><span>L'APPLI CALCULE AUJOURD'HUI</span><span id="scal">${e2(cal)}</span></div></div>` : ''}
+  const ps = partageSolde(cal || 0), rd = f.rd || auj(), rmin = retraitMin();
+  let h = enteteSheet('MON SOLDE', 'reglages');
+  if (cal != null) h += `<div class="ticket" style="margin-top:10px"><div class="tl"><span>🏦 SUR LE COMPTE</span><span id="sbq">${e2(ps.banque)}</span></div><div class="tl"><span>💶 ESPÈCES EN POCHE</span><span id="sesp">${e2(ps.esp)}</span></div><div class="tl tot"><span>TOTAL ESTIMÉ AUJOURD'HUI</span><span id="scal">${e2(cal)}</span></div></div>`;
+  h += `<div class="note" style="display:block;margin-top:${cal != null ? 14 : 10}px;font-family:var(--mono);font-size:11px">ESPÈCES : <span class="espv">${e2(ps.base)} €</span> ${ps.depuis ? 'déclarés le ' + jjmm(ps.depuis) : 'déclarées'}${ps.ret ? ` · <span class="espv">+${e2(ps.ret)} €</span> retirés` : ''}${ps.dep ? ` · <span class="espv">−${e2(ps.dep)} €</span> payés en espèces` : ''}</div>`
+    + (ps.neg ? `<div class="alert" style="margin-top:8px">⚠ ${AVERT_ESP[0].toUpperCase() + AVERT_ESP.slice(1)} (il te manquerait ${e2(-ps.brut)} €).</div>` : '');
+  h += f.ret ? `<div class="grp" style="margin-top:14px">RETRAIT AU DISTRIBUTEUR</div>
+      <input class="libin" data-f="rm" id="rm" inputmode="decimal" placeholder="Montant retiré en €" value="${esc(f.rm)}" style="margin-top:0">
+      <div class="mrow"><button class="mbtn" data-act="ret-d:-1" aria-label="Jour précédent" ${rd <= rmin ? 'disabled style="opacity:.3"' : ''}>‹</button><span>RETIRÉ LE · <b>${libDate(rd)}</b></span><button class="mbtn" data-act="ret-d:1" aria-label="Jour suivant" ${rd >= auj() ? 'disabled style="opacity:.3"' : ''}>›</button></div>
+      <div class="err" id="rerr"></div>
+      <button class="go" data-act="ret-ok" style="margin-top:8px">NOTER LE RETRAIT</button>
+      <button class="ghost" data-act="ret-x">ANNULER</button>
+      <div class="note" style="display:block">Ce n'est pas une dépense : l'argent passe de ta banque à ta poche, ton total ne bouge pas.</div>`
+    : `<button class="ghost" data-act="ret-open" style="margin-top:12px">🏧 RETRAIT D'ESPÈCES</button>`;
+  if (ps.r.length) h += `<div class="grp" style="margin-top:14px">RETRAITS DEPUIS LE DERNIER CONTRÔLE</div>` + ps.r.map((x, i) => `<button class="up" data-act="ret-del" data-i="${i}" aria-label="Retirer ce retrait"><span>${esc(jjmm(x.d))}</span><span>Distributeur</span><span>+${e2(+x.m || 0)} <span class="c-mute">✕</span></span></button>`).reverse().join('');
+  h += `<div class="grp" style="margin-top:18px">NOUVEAU CONTRÔLE</div><div class="note" style="display:block;margin-top:0">Quand tu veux (idéalement le 1er) : tape ce qu'il y a sur ton compte aujourd'hui <b>et le liquide que tu as en poche</b>. L'appli repart de ces deux montants. Entre deux contrôles, elle suit tes espèces : « Payé en espèces » dans une dépense les fait baisser, un retrait au distributeur les fait monter (et baisser la banque).</div>
     <div class="grp" style="margin-top:14px">SUR TON COMPTE AUJOURD'HUI</div>
     <div style="display:flex;gap:8px"><button class="chip ${f.neg ? 'on' : ''}" data-act="s-neg" style="height:42px;margin-top:10px" aria-label="Solde négatif">±</button>
       <input class="libin" data-f="banque" inputmode="decimal" placeholder="Solde de ton compte en €" value="${esc(f.banque)}"></div>
-    <input class="libin" data-f="especes" inputmode="decimal" placeholder="Espèces en poche (liquide pas encore dépensé)" value="${esc(f.especes)}" style="margin-top:0">
+    <div class="grp">ESPÈCES EN POCHE AUJOURD'HUI</div><input class="libin" data-f="especes" inputmode="decimal" placeholder="Liquide que tu as sur toi, en €" value="${esc(f.especes)}" style="margin-top:0">
     ${d >= 20 && sal > 0 ? `<button class="chip ${f.salDeja ? 'on' : ''}" data-act="s-sal" style="margin-top:2px;white-space:normal;text-align:left">${f.salDeja ? '✓ ' : ''}Mon salaire du mois prochain (${e0(sal)}) est déjà sur le compte</button>` : ''}
     <div class="hint" id="secart" style="margin-top:6px"></div><div class="err" id="ferr"></div>
     <button class="go" data-act="s-ok">C'EST MON SOLDE</button>
@@ -2167,7 +2351,7 @@ function rendreReglages() {
     <button class="opt" data-act="go:budgets"><span>Budgets par catégorie</span><span class="muted mono" style="font-size:12px">${e0(bud)}/mois ›</span></button>
     <button class="opt" data-act="go:cats"><span>Catégories et favorites</span><span class="muted mono" style="font-size:12px">${cats().length} · ${S.data.libres || 0} libre${(S.data.libres || 0) > 1 ? 's' : ''} ›</span></button>
     <button class="opt" data-act="go:solde"><span>Mon solde (quand tu veux, idéalement le 1er)</span><span class="muted mono" style="font-size:12px">${lc ? 'dernier : ' + lc.date : 'jamais noté'} ›</span></button>
-    <div style="margin-top:10px"></div>${tg('aides', !LS.get('aidesOff', false), "Petits « ? » d'aide sur l'accueil", 'explications à côté d\'Argent restant, Fin de mois, du graphique…')}
+    <div style="margin-top:10px"></div>${tg('aides', !LS.get('aidesOff', false), "Aides et explications", 'les « ? » de l\'accueil et l\'aide de la saisie')}
     <div class="grp" style="margin-top:18px">ACCUEIL</div>
     <div class="grp" style="margin:6px 0 0;letter-spacing:1px">ORDRE DES BUDGETS SUR L'ACCUEIL</div>
     <div class="note" style="margin:2px 0 4px;display:block">${ob === 'perso' ? 'Mon ordre : celui que tu as choisi dans Réglages › Catégories (flèches ▲▼).' : 'Les plus urgents d\'abord : ceux proches de leur limite, puis ceux déjà dépassés, puis ceux bien tenus.'}</div>
@@ -2317,7 +2501,7 @@ function vueProgres() {
   if (!vis.length) return '';
   let cur = S.progT || LS.get('progT', 'bilans'); if (!vis.some(([k]) => k === cur)) cur = vis[0][0];
   let h = '';
-  if (ej) { const ti = LS.get('cos_titre', '') || ej.titre; const pz = ej.niv === NIV_MAX; h += `<button class="nivmini ${pz ? 'prestige' : ''}" data-act="ptab" data-t="succes"><b>NIV. ${ej.niv}${pz && ej.prest ? ' <em>' + etoilesTxt(ej.prest) + '</em>' : ''}</b><span>${esc(ti.toUpperCase())}</span><i><u style="width:${Math.round((pz ? ej.pfrac : ej.frac) * 100)}%"></u></i><small>${ej.xp} XP</small></button>`; }
+  if (ej) { const ti = titreCos(ej); const pz = ej.niv === NIV_MAX; h += `<button class="nivmini ${pz ? 'prestige' : ''}" data-act="ptab" data-t="succes"><b>NIV. ${ej.niv}${pz && ej.prest ? ' <em>' + etoilesTxt(ej.prest) + '</em>' : ''}</b><span>${esc(ti.toUpperCase())}</span><i><u style="width:${Math.round((pz ? ej.pfrac : ej.frac) * 100)}%"></u></i><small>${ej.xp} XP</small></button>`; }
   h += `<div class="ptabs">${vis.map(([k, l]) => `<button class="${cur === k ? 'on' : ''}" data-act="ptab" data-t="${k}">${l}</button>`).join('')}</div>`;
   const [c, fk] = T[cur];
   h += `<div class="pcont">${c}${blocProchainement(fk)}</div>`;
@@ -2346,7 +2530,8 @@ const ACCENTS = [
   { id: 'polaris', nom: 'Polaris', niv: 99, prest: 1, c: ['#D9A50F', '#9A7408', '#FFD966'] },
   { id: 'lavande', nom: 'Lavande', niv: 26, c: ['#9B7FE0', '#6E52BF', '#CDBDF5'] }, { id: 'emeraude', nom: 'Émeraude', niv: 29, c: ['#0E8A5F', '#086444', '#5ED6A8'] }];
 function appliquerAccent() {
-  const a = ACCENTS.find(x => x.id === LS.get('accent', 'foret')) || ACCENTS[0], st = document.documentElement.style;
+  let ac; try { ac = cos('accent'); } catch (e) { ac = LS.get('accent', 'foret'); } // cos() n'existe pas encore au tout premier appel
+  const a = ACCENTS.find(x => x.id === ac) || ACCENTS[0], st = document.documentElement.style;
   document.body && document.body.classList.toggle('accent', !!a.c);
   if (!a.c) { ['--ok', '--okInk', '--acc'].forEach(k => st.removeProperty(k)); return; }
   const dark = document.documentElement.dataset.theme === 'dark';
@@ -2385,20 +2570,21 @@ function faitsJeu() {
   const M = moisJeu().map(([y, m]) => {
     const c = calc(y, m), bu = budgets(y, m).filter(x => !x.sa), nd = c.restant + c.av + c.ep;
     const df = etatDefi(y, m);
+    // moisJeu() = mois TERMINÉS seulement : le mois en cours ne compte jamais pour les taux, le vert ou les budgets tenus
     return { y, m, vert: c.restant + c.av >= -0.5, zero: bu.length > 0 && bu.every(x => x.reste >= -0.5), taux: c.rev > 0 ? nd / c.rev : 0, defiOk: !!(df && df.ok), defiLance: !!df, defiMarge: df && df.montant > 0 ? (df.montant - df.dep) / df.montant : 0, bu };
   });
   const J = joursJeu(), apresDebut = e => e.y && ymNum(e.y, e.m) >= ymNum(JEU_DEBUT.y, JEU_DEBUT.m);
   const coteL = S.journal.filter(e => !e.deleted && apresDebut(e) && /mis de côté/i.test(e.lib || '') && e.montant > 0);
-  const cote = coteL.reduce((t, e) => t + e.montant, 0);
+  const cote = coteL.reduce((t, e) => t + e.montant, 0), nCoteMois = new Set(coteL.map(e => ymNum(e.y, e.m))).size;
   const rembs = S.journal.filter(e => !e.deleted && apresDebut(e) && estAv(e.cat) && e.montant < 0).length;
   const defisLances = Object.keys((S.data && S.data.defis) || {}).filter(k => { const [y, m] = k.split('-').map(Number); return ymNum(y, m) >= ymNum(JEU_DEBUT.y, JEU_DEBUT.m); }).length;
   const budTenu3 = budgetsDefiables().some(c => maxSerie(M.map(x => { const b = x.bu.find(z => z.c.nom === c.nom); return !!b && b.reste >= -0.5; })) >= 3);
   const v = {
-    M, J, cote, nCote: coteL.length, rembs, defisLances,
+    M, J, cote, nCote: coteL.length, nCoteMois, rembs, defisLances,
     serieJours: maxSerie(J.map(x => x[1])),
     serieJoursCur: S.journal.some(e => !e.deleted && e.date === auj() && e.montant > 0 && casseSerie(e.cat)) ? 0 : finSerie(J.map(x => x[1])),
     vertCur: finSerie(M.map(x => x.vert)), zeroCur: finSerie(M.map(x => x.zero)), defiCur: finSerie(M.map(x => x.defiOk)),
-    epargne: moisJeu().concat([[now.getFullYear(), now.getMonth() + 1]]).reduce((t, [y, m]) => t + calc(y, m).epV, 0),
+    epargne: moisJeu().reduce((t, [y, m]) => t + calc(y, m).epV, 0) + epargneCourante(), // réellement versée : pas les virements à venir
     joursSans: J.filter(x => x[1] === true).length,
     vertSerie: maxSerie(M.map(x => x.vert)), nVert: M.filter(x => x.vert).length,
     zeroSerie: maxSerie(M.map(x => x.zero)), nZero: M.filter(x => x.zero).length,
@@ -2421,6 +2607,13 @@ function faitsJeu() {
     v.objOk = ouvert('objectif') ? Object.keys(objectifs()).filter(y => +y >= 2026 && (etatObjectif(+y) || {}).atteint).length : 0;
   } catch (e) { Object.assign(v, { objOk: 0, semOk: 0, novOk: 0, aventOk: 0 }); }
   S._jeu = { k: memo, q: S.journal.length, v }; return v;
+}
+// Épargne du mois en cours déjà passée : lignes datées jusqu'à aujourd'hui + prélèvements de l'échéancier dont le jour est arrivé
+function epargneCourante() {
+  const y = now.getFullYear(), m = now.getMonth() + 1, A = auj(), cm = catMap(), ep = n => { const c = cm[n]; return !!c && c.type === 'Épargne' && !estAv(n); };
+  let t = S.journal.filter(e => !e.deleted && e.y === y && e.m === m && e.montant && ep(e.cat) && (!e.date || e.date <= A)).reduce((s, e) => s + e.montant, 0);
+  ((S.data && S.data.echeancier) || []).forEach(e => { if (ep(e.cat) && (e.jour || 1) <= now.getDate()) t += echMontant(e, y, m); });
+  return t;
 }
 // --- Succès (une fois) ---
 const SUCCES = [
@@ -2475,7 +2668,30 @@ const SUCCES = [
   ['missions-12', 'extreme', 'Agent double zéro', 'Réussir 12 missions du mois', f => [f.missions, 12]],
   ['taux-25-3', 'extreme', 'Fourmi reine', '3 mois à 25 % de revenus non dépensés', f => [f.taux25, 3]],
   ['semaines-25', 'extreme', 'Métronome', 'Réussir 25 défis de la semaine', f => [f.semOk, 25]],
-  ['vert-24', 'extreme', 'Deux ans verts', '24 mois dans le vert d\'affilée', f => [f.vertSerie, 24, f.vertCur]]
+  ['vert-24', 'extreme', 'Deux ans verts', '24 mois dans le vert d\'affilée', f => [f.vertSerie, 24, f.vertCur]],
+  // 9.5 : paliers de long terme (rien n'est gagnable avec un seul mois d'historique ; les extrêmes demandent des années)
+  ['verts-2', 'facile', 'Deux fois vert', 'Finir 2 mois dans le vert', f => [f.nVert, 2]],
+  ['defis-2', 'facile', 'Doublé', 'Réussir 2 défis du mois', f => [f.defisOk, 2]],
+  ['coffre-3', 'facile', 'Écureuil', 'Mettre de côté le reste de 3 mois différents', f => [f.nCoteMois, 3]],
+  ['weekends-8', 'moyen', 'Huit week-ends calmes', '8 week-ends sans dépense courante', f => [f.weekends, 8]],
+  ['semaines-10', 'moyen', 'Dix semaines', 'Réussir 10 défis de la semaine', f => [f.semOk, 10]],
+  ['taux-10-3', 'moyen', 'Épargnant régulier', '3 mois à 10 % de revenus non dépensés', f => [f.taux10, 3]],
+  ['jours-tot-100', 'difficile', 'Cent jours calmes', '100 jours sans dépense courante au total', f => [f.joursSans, 100]],
+  ['semaines-20', 'difficile', 'Vingt semaines', 'Réussir 20 défis de la semaine', f => [f.semOk, 20]],
+  ['ev-15', 'difficile', "Traqueur d'éclairs", 'Réussir 15 événements éclair', f => [f.evOk.length, 15]],
+  ['verts-18', 'difficile', 'Dix-huit mois verts', 'Finir 18 mois dans le vert (pas forcément d\'affilée)', f => [f.nVert, 18]],
+  ['jours-60', 'extreme', 'Ermite', '60 jours d\'affilée sans dépense courante', f => [f.serieJours, 60, f.serieJoursCur]],
+  ['jours-90', 'extreme', 'Saison blanche', '90 jours d\'affilée sans dépense courante', f => [f.serieJours, 90, f.serieJoursCur]],
+  ['jours-tot-365', 'extreme', 'Une année de calme', '365 jours sans dépense courante au total', f => [f.joursSans, 365]],
+  ['verts-36', 'extreme', 'Trente-six mois verts', 'Finir 36 mois dans le vert', f => [f.nVert, 36]],
+  ['zero-12', 'extreme', 'Douze sans faute', '12 mois sans aucun budget dépassé (au total)', f => [f.nZero, 12]],
+  ['defis-30', 'extreme', 'Trentenaire', 'Réussir 30 défis du mois', f => [f.defisOk, 30]],
+  ['missions-24', 'extreme', 'Agent émérite', 'Réussir 24 missions du mois', f => [f.missions, 24]],
+  ['ev-30', 'extreme', "Maître des éclairs", 'Réussir 30 événements éclair', f => [f.evOk.length, 30]],
+  ['ev-leg-3', 'extreme', 'Triple légende', 'Réussir 3 événements légendaires', f => [f.evOk.filter(x => x.def.rar === 'legendaire').length, 3]],
+  ['cote-20000', 'extreme', 'Coffre-fort', 'Épargner 20 000 € depuis novembre 2026', f => [Math.round(f.epargne), 20000]],
+  ['taux-25-6', 'extreme', 'Colonie de fourmis', '6 mois à 25 % de revenus non dépensés', f => [f.taux25, 6]],
+  ['avent-2', 'extreme', 'Deux Noëls', "Réussir 2 calendriers de l'avent (15 cases)", f => [f.aventOk, 2]]
 ].map(([id, d, nom, txt, fn]) => ({ id, d, nom, txt, fn }));
 function etatJeu() {
   const f = faitsJeu(); if (S._etat && S._etat.f === f) return S._etat.v; // même faits → même état (mémorisé)
@@ -2518,16 +2734,66 @@ function annoncerJeu() {
   if (!on('jeu') || !S.data) return;
   const e = etatJeu();
   // première fois : on mémorise sans rien annoncer
-  if (LS.get('nivVu', null) == null) { journaliserXP(e); LS.set('nivVu', e.niv); LS.set('xpVu', e.xp); LS.set('cosmVus', tousCosm().filter(o => debloque(o, e.niv)).map(o => o.t + ':' + o.id)); nouveautes(e); return; }
-  journaliserXP(e);
+  try { nettoyerVitrine(); verifierCosmetiques(); } catch (err) {}
+  if (LS.get('nivVu', null) == null) { journaliserXP(e); defisMoisChange(e); LS.set('nivVu', e.niv); LS.set('xpVu', e.xp); LS.set('cosmVus', tousCosm().filter(o => debloque(o, e.niv)).map(o => o.t + ':' + o.id)); nouveautes(e); return; }
+  const ch = journaliserXP(e), dm = defisMoisChange(e);
   const dxp = e.xp - LS.get('xpVu', e.xp); if (dxp > 0) xpFlottante(dxp); LS.set('xpVu', e.xp);
   const n = nouveautes(e); if (n.length) LS.set('jeuVus', [...new Set(LS.get('jeuVus', []).concat(n))]);
   const avant = LS.get('nivVu', e.niv);
   if (e.niv > avant) { LS.set('nivVu', e.niv); ecranNiveau(avant, e); return; }
   if (e.niv < avant) LS.set('nivVu', e.niv);
   { const pv = LS.get('prestVu', null); if (pv == null) LS.set('prestVu', e.prest); else if (e.prest > pv) { LS.set('prestVu', e.prest); ecranNiveau(pv, e, true); return; } else if (e.prest < pv) LS.set('prestVu', e.prest); }
-  if (n.length) { const s0 = SUCCES.find(x => 's:' + x.id === n[0]); const dbq = tousCosm().filter(o => o.suc === s0.id); toast('🏆 Succès : ' + s0.nom + ' (+' + DIFF[s0.d].xp + ' XP)' + (dbq.length ? ' · débloque « ' + dbq.map(o => o.nom).join(' », « ') + ' »' : ''), 'VOIR', () => { S.tab = 'stats'; S.statsVue = 'progres'; S.progT = dbq.length ? 'style' : 'succes'; if (dbq.length) S.collT = dbq[0].t; rendre(); scrollTo(0, 0); }); celebrer(); }
-  majBadgeProgres(e); annoncerEv();
+  majBadgeProgres(e);
+  const ev = annoncerEv() || { gagnes: [], neuf: null };
+  annoncerGains(e, ch, n, ev, dm);
+}
+// --- Annonce explicite des gains : une carte, une ligne par gain avec son XP (succès, événements, défis, jours…) ---
+const GAINS_LIB = {
+  'Jours sans dépense courante': n => n + ' jour' + (n > 1 ? 's' : '') + ' sans dépense', 'Mois bouclés': n => n > 1 ? n + ' mois bouclés' : 'Mois bouclé',
+  'Mois dans le vert': n => (n > 1 ? n + ' mois' : 'Mois') + ' dans le vert', 'Défis réussis': n => n > 1 ? n + ' défis du mois réussis' : 'Défi du mois réussi',
+  'Restes mis de côté': n => n > 1 ? n + ' restes mis de côté' : 'Reste du mois mis de côté', 'Mois sans budget dépassé': n => (n > 1 ? n + ' mois' : 'Mois') + ' sans budget dépassé',
+  'Mois à 10 % non dépensés': n => (n > 1 ? n + ' mois' : 'Mois') + ' à 10 % non dépensés', 'Mois à 25 % non dépensés': n => (n > 1 ? n + ' mois' : 'Mois') + ' à 25 % non dépensés',
+  'Défis de la semaine réussis': n => n > 1 ? n + ' défis de la semaine réussis' : 'Défi de la semaine réussi', 'Missions du mois réussies': n => n > 1 ? n + ' missions du mois réussies' : 'Mission du mois réussie',
+  'Week-ends sans dépense': n => n > 1 ? n + ' week-ends sans dépense' : 'Week-end sans dépense' };
+// Mois dont le défi est réussi : sert à dire « défi de novembre » plutôt que « défi du mois »
+function defisMoisChange(e) {
+  const ok = e.f.M.filter(x => x.defiOk).map(x => x.y + '-' + x.m), avant = LS.get('defisOkMois', null); LS.set('defisOkMois', ok);
+  return avant ? { plus: ok.filter(k => !avant.includes(k)), moins: avant.filter(k => !ok.includes(k)) } : { plus: [], moins: [] };
+}
+const moisDefi = k => MOIS[+k.split('-')[1] - 1].toLowerCase();
+function annoncerGains(e, ch, nv, ev, dm) {
+  const G = [], P = [], fx = v => (v > 0 ? '+' : '−') + Math.abs(v) + ' XP';
+  let voir = null, fete = false, dbqTout = [];
+  const sucs = new Set(ch.filter(c => c.k.startsWith('s:') && c.v > 0).map(c => c.k).concat(nv));
+  sucs.forEach(k => { const s = SUCCES.find(x => 's:' + x.id === k); if (!s) return; const dbq = tousCosm().filter(o => o.suc === s.id); dbqTout = dbqTout.concat(dbq);
+    G.push('🏆 Succès « ' + s.nom + ' » · +' + DIFF[s.d].xp + ' XP' + (dbq.length ? ' · débloque « ' + dbq.map(o => o.nom).join(' », « ') + ' »' : '')); fete = true; });
+  ev.gagnes.forEach(x => { G.push('🏅 Badge « ' + x.def.nom + ' » · +' + RAR[x.def.rar].xp + ' XP'); fete = true; });
+  ch.forEach(c => {
+    if (c.k.startsWith('s:')) { if (c.v < 0) P.push(fx(c.v) + ' · succès « ' + libXP(c.k).replace(/^Succès « |»$/g, '').trim() + ' » perdu (ligne ajoutée ou corrigée)'); return; }
+    const lab = c.k.slice(2); if (c.v > 0 && /^Événements .* réussis$/.test(lab) && ev.gagnes.length) return; // déjà dit par le badge
+    const r = e.rec.find(x => x[0] === lab), u = r && r[2] > 0 ? r[2] : 0, n = u ? Math.max(1, Math.round(Math.abs(c.v) / u)) : 1;
+    if (lab === 'Défis réussis' && (c.v > 0 ? dm.plus : dm.moins).length === n) { const L = (c.v > 0 ? dm.plus : dm.moins).map(moisDefi).join(', ');
+      if (c.v > 0) G.push('🎯 Défi de ' + L + ' réussi · ' + fx(c.v)); else P.push(fx(c.v) + ' · défi de ' + L + ' annulé (dépense ajoutée ou corrigée)'); return; }
+    const t = (GAINS_LIB[lab] || (k => (k > 1 ? k + ' × ' : '') + lab))(n);
+    if (c.v > 0) G.push(t + ' · ' + fx(c.v)); else P.push(fx(c.v) + ' · ' + t.charAt(0).toLowerCase() + t.slice(1) + ' en moins (ligne ajoutée ou corrigée)');
+  });
+  if (ev.neuf) G.push('⚡ Nouvel événement : ' + ev.neuf.def.nom);
+  if (!G.length && !P.length) return;
+  if (dbqTout.length) voir = () => { S.tab = 'stats'; S.statsVue = 'progres'; S.progT = 'style'; S.collT = dbqTout[0].t; rendre(); scrollTo(0, 0); };
+  else if (fete || G.length) voir = () => { S.tab = 'stats'; S.statsVue = 'progres'; S.progT = ev.neuf && !fete ? 'defis' : 'succes'; rendre(); scrollTo(0, 0); };
+  const plus = ch.filter(c => c.v > 0).reduce((t, c) => t + c.v, 0), moins = ch.filter(c => c.v < 0).reduce((t, c) => t - c.v, 0);
+  carteGains(plus > 0 ? 'GAGNÉ · +' + plus + ' XP' : G.length ? 'DU NOUVEAU' : 'XP RECALCULÉE · −' + moins + ' XP', G, P, voir);
+  if (fete) celebrer();
+}
+function carteGains(titre, G, P, voir) {
+  const ancien = $('#gains'); if (ancien) ancien.remove(); document.querySelectorAll('.xpf').forEach(x => x.remove()); // la carte dit déjà l'XP
+  const el = document.createElement('div'); el.id = 'gains'; el.setAttribute('role', 'status');
+  const L = G.slice(0, 6), reste = G.length + P.length - L.length - Math.min(P.length, 2);
+  el.innerHTML = `<b>${esc(titre)}</b>${L.map(t => `<div>${esc(t)}</div>`).join('')}${P.slice(0, 2).map(t => `<div class="gperte">${esc(t)}</div>`).join('')}${reste > 0 ? `<div class="gperte">+ ${reste} autre${reste > 1 ? 's' : ''} · voir le journal d'XP</div>` : ''}${voir ? '<span class="gvoir">VOIR ›</span>' : ''}`;
+  document.body.appendChild(el); requestAnimationFrame(() => el.classList.add('on'));
+  const fin = () => { el.classList.remove('on'); setTimeout(() => el.remove(), 300); };
+  clearTimeout(S._gainsT); S._gainsT = setTimeout(fin, 4800);
+  el.onclick = ev => { clearTimeout(S._gainsT); fin(); if (voir && ev.target.closest('.gvoir')) voir(); };
 }
 // --- Journal de l'XP : chaque gain ou perte, avec sa source (gardé sur ce téléphone) ---
 function detailXP(e) {
@@ -2542,11 +2808,12 @@ function libXP(k) {
 }
 function journaliserXP(e) {
   const avant = LS.get('xpDetail', null), apres = detailXP(e); LS.set('xpDetail', apres);
-  if (!avant) return; // premier passage : on pose juste la référence
+  if (!avant) return []; // premier passage : on pose juste la référence
   const L = LS.get('xpLog', []), d = new Date(), h = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  let n = 0;
-  new Set(Object.keys(avant).concat(Object.keys(apres))).forEach(k => { const v = (apres[k] || 0) - (avant[k] || 0); if (v) { L.unshift({ j: auj(), h, k, v }); n++; } });
-  if (n) LS.set('xpLog', L.slice(0, 100));
+  const ch = [];
+  new Set(Object.keys(avant).concat(Object.keys(apres))).forEach(k => { const v = (apres[k] || 0) - (avant[k] || 0); if (v) { L.unshift({ j: auj(), h, k, v }); ch.push({ k, v }); } });
+  if (ch.length) LS.set('xpLog', L.slice(0, 100));
+  return ch; // les changements, pour la carte des gains
 }
 function rendreXpInfo() {
   const G = [
@@ -2637,7 +2904,7 @@ function recompensesAVenir(e) {
 }
 function blocNiveau(e) {
   const prochain = tousCosm().filter(o => !o.suc && !o.prest && o.niv > e.niv).sort((a, b) => a.niv - b.niv)[0];
-  const ti = LS.get('cos_titre', '') || e.titre, M = dispo('cosmetiques') && cos('mascotte') !== 'off' ? mascotte() : null;
+  const ti = titreCos(e), M = dispo('cosmetiques') && cos('mascotte') !== 'off' ? mascotte() : null;
   if (e.niv === NIV_MAX) {
     const pr = tousCosm().filter(o => o.prest > e.prest).sort((a, b) => a.prest - b.prest)[0], pt = PRESTIGE_TITRES.find(t => t[0] > e.prest);
     return `<div class="niv prestige ${palier(e.niv)}">${M ? `<button class="mascn" data-act="masc">${M.s[1]}</button>` : ''}<div class="nivh"><b>NIV. 30</b><span>${esc(ti.toUpperCase())}</span><small>${e.xp} XP</small></div>
@@ -2714,7 +2981,7 @@ function rendreWrapped() {
   $('#sheetIn').innerHTML = `<div class="grab"></div><div class="shead"><span>MON ANNÉE ${b.y}${b.enCours ? ' (EN COURS)' : ''}</span><button class="ibtn" data-act="close" aria-label="Fermer">${ico.x}</button></div>
     <button class="play" data-act="story" data-k="a" data-y="${b.y}"><span>▶</span> LANCER MON WRAPPED ${b.y}</button>
     <div class="wrap">
-      <div class="whero"><small>NON DÉPENSÉ SUR ${b.n} MOIS</small><b class="${b.nd < 0 ? 'c-bad' : ''}">${b.nd >= 0 ? '+' : ''}${e0(b.nd)}</b><span>soit ${Math.round(b.taux * 100)} % de tes revenus</span></div>
+      <div class="whero"><small>NON DÉPENSÉ SUR ${b.n} MOIS</small><b class="${b.nd < 0 ? 'c-bad' : ''}">${b.nd >= 0 ? '+' : ''}${e0(b.nd)}</b><span>soit ${Math.round(b.taux * 100)} % de tes revenus${b.ep > 0.5 ? ` · dont ${e0(b.ep)} en épargne` : ''}</span></div>
       <div class="wgrid">
         ${tile('MOIS DANS LE VERT', b.verts + '/' + b.n, b.serie > 1 ? 'meilleure série : ' + b.serie : '')}
         ${tile('MEILLEUR MOIS', esc(MOIS[b.best.m - 1]), (b.best.res >= 0 ? '+' : '') + e0(b.best.res))}
@@ -2752,11 +3019,22 @@ const ouvert = k => dispo(k) && on(k === 'cosmetiques' ? 'jeu' : k);
 // --- Défi de la semaine ---
 const lundi = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
 const isoJ = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-function depSemaine(cat, l) { const a = isoJ(l), f = new Date(l); f.setDate(f.getDate() + 6); const b = isoJ(f); return S.journal.filter(e => !e.deleted && e.date && e.date >= a && e.date <= b && e.cat === cat && e.montant > 0).reduce((t, e) => t + e.montant, 0); }
+// Familles de catégories POUR LE JEU SEULEMENT (défi de la semaine, mission « coup de frein ») :
+// « Jeux de société » et « Jeux vidéos » (et leurs variantes d'écriture) comptent ensemble comme « Biens personnels ».
+// Budgets, stats, Journal et Sheet ne changent pas. Aucune catégorie de la famille → aucun effet.
+const FAMILLES_JEU = [['Biens personnels', /^jeux? (de )?(societe|video)s?$/]];
+const nomJeuNorm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+function familleJeu(cat) { const n = nomJeuNorm(cat), f = FAMILLES_JEU.find(x => x[1].test(n)); return f ? f[0] : cat; }
+// Catégories réelles derrière un nom du jeu : les membres d'une famille, sinon la catégorie elle-même (un ancien défi sur « Jeux vidéos » reste sur « Jeux vidéos »)
+function catsJeu(nom) { const L = FAMILLES_JEU.some(x => x[0] === nom) ? cats().filter(c => familleJeu(c.nom) === nom).map(c => c.nom) : []; return L.length ? L.concat(L.includes(nom) ? [] : [nom]) : [nom]; }
+const depMoisJeu = (nom, y, m) => catsJeu(nom).reduce((t, c) => t + depenseMois(c, y, m), 0);
+function depSemaine(cat, l) { const a = isoJ(l), f = new Date(l); f.setDate(f.getDate() + 6); const b = isoJ(f), C = catsJeu(cat); return S.journal.filter(e => !e.deleted && e.date && e.date >= a && e.date <= b && C.includes(e.cat) && e.montant > 0).reduce((t, e) => t + e.montant, 0); }
 function propositionSemaine() {
-  const l = lundi(now); const cand = budgetsDefiables().filter(c => c.suivi === 'Mensuel' || c.suivi === 'Annuel').map(c => {
-    let t = 0; for (let k = 1; k <= 4; k++) { const d = new Date(l); d.setDate(d.getDate() - 7 * k); t += depSemaine(c.nom, d); }
-    const moy = t / 4 || c.budget * 12 / 52; return { cat: c.nom, moy };
+  const l = lundi(now), G = {};
+  budgetsDefiables().filter(c => c.suivi === 'Mensuel' || c.suivi === 'Annuel').forEach(c => { const k = familleJeu(c.nom); (G[k] = G[k] || []).push(c); });
+  const cand = Object.keys(G).map(k => {
+    let t = 0; for (let w = 1; w <= 4; w++) { const d = new Date(l); d.setDate(d.getDate() - 7 * w); t += depSemaine(k, d); }
+    const moy = t / 4 || G[k].reduce((s, c) => s + c.budget, 0) * 12 / 52; return { cat: k, moy };
   }).sort((a, b) => b.moy - a.moy)[0];
   if (!cand) return null;
   return { cat: cand.cat, montant: Math.max(5, Math.round(cand.moy * 0.8 / 5) * 5) };
@@ -2874,7 +3152,16 @@ const AFFICHES = {
   'defis-suite-3': ['station', 2, "L'ENCHAÎNEMENT"], 'chelem': ['vaisseau', 2, 'LE GRAND CHELEM'], 'missions-6': ['nebuleuse', 1, 'AGENT SPÉCIAL'], 'chelem-3': ['trounoir', 1, 'LA TRILOGIE'],
   'ev-5': ['comete', 0, "CHASSEURS D'ÉCLAIRS"], 'jours-tot-50': ['dunes', 1, 'CINQUANTE SOLEILS'], 'ev-leg': ['portail', 2, 'LA LÉGENDE'], 'ev-tous': ['nebuleuse', 2, 'LA COLLECTION'],
   'jours-tot-200': ['lune', 0, "L'ASCÈTE"], 'missions-12': ['vaisseau', 0, 'DOUBLE ZÉRO'], 'taux-25-3': ['foret', 0, 'LA FOURMILIÈRE'], 'semaines-25': ['ville', 0, 'MÉTRONOME'],
-  'vert-24': ['foret', 2, 'LA SAGA VERTE'], 'cote-1000': ['canyon', 0, "LA RUÉE VERS L'OR"] };
+  'vert-24': ['foret', 2, 'LA SAGA VERTE'], 'cote-1000': ['canyon', 0, "LA RUÉE VERS L'OR"],
+  // 9.5 : nouvelles affiches (décors existants)
+  'verts-2': ['foret', 1, 'LES DEUX RIVES'], 'defis-2': ['comete', 2, 'LE DOUBLÉ'], 'coffre-3': ['canyon', 1, "L'ÉCUREUIL D'ORBITE"],
+  'weekends-8': ['ocean', 0, 'HUIT MARÉES'], 'semaines-10': ['ville', 1, 'DIX SEMAINES'], 'taux-10-3': ['ocean', 2, 'LES TROIS LUNES'],
+  'jours-tot-100': ['dunes', 0, 'CENT SOLEILS'], 'semaines-20': ['station', 1, 'LA RONDE DES SEMAINES'], 'ev-15': ['comete', 1, 'LA TRAQUE'],
+  'verts-18': ['foret', 2, 'LA GRANDE CANOPÉE'], 'jours-60': ['lune', 1, "L'ERMITE DE SÉLÈNE"], 'jours-90': ['aurore', 2, 'LA SAISON BLANCHE'],
+  'jours-tot-365': ['dunes', 2, 'UNE ANNÉE DE SABLE'], 'verts-36': ['aurore', 1, 'LA FORÊT ÉTERNELLE'], 'zero-12': ['vaisseau', 2, 'LA FLOTTE PARFAITE'],
+  'defis-30': ['nebuleuse', 1, 'LES TRENTE ÉPREUVES'], 'missions-24': ['portail', 1, 'AGENT ÉMÉRITE'], 'ev-30': ['nebuleuse', 0, 'LE MAÎTRE DES ÉCLAIRS'],
+  'ev-leg-3': ['portail', 2, 'LA TRIPLE LÉGENDE'], 'cote-20000': ['trounoir', 0, 'LE COFFRE-FORT'], 'taux-25-6': ['trounoir', 1, 'LA COLONIE'],
+  'avent-2': ['neige', 0, 'DEUX NOËLS SUR ANDROMÈDE'] };
 const afficheDe = id => AFFICHES[id] || ['orbite', 0, 'ORBITE'];
 // Écusson de chaque événement éclair : scène + variante
 const ECUSSONS = { blanche: ['lune', 0], cochon: ['canyon', 0], chrono: ['comete', 0], trois5: ['nebuleuse', 2], cocon: ['ocean', 1], maison: ['foret', 0], folie: ['aurore', 0], sobre: ['dunes', 0],
@@ -2941,12 +3228,23 @@ function badgesGagnes() {
   return L;
 }
 function vitrine() { const p = getPref('jeu', {}) || {}; return Array.isArray(p.vitrine) ? p.vitrine : null; }
+// Les succès ne sont pas mémorisés (une dépense saisie après coup peut en faire perdre un) :
+// la vitrine ne compte que les badges ENCORE gagnés (compteurs n/3, limite de 3).
+function vitrineValide() {
+  const v = vitrine() || []; if (!v.length || !on('jeu') || !S.data) return v;
+  const G = new Set(badgesGagnes().map(b => b.id)); return v.filter(id => G.has(id));
+}
+// Retire de la préférence les badges perdus (appelé après chaque affichage, une fois les données chargées)
+function nettoyerVitrine() {
+  const v = vitrine(); if (!v || !v.length || !on('jeu') || !S.data) return;
+  const w = vitrineValide(); if (w.length !== v.length) setPref('jeu', Object.assign({}, getPref('jeu', {}) || {}, { vitrine: w }));
+}
 function vitrineAffichee() {
   const G = badgesGagnes(), v = vitrine();
   return (v || []).map(id => G.find(b => b.id === id)).filter(Boolean).slice(0, 3); // rien d'affiché tant que tu n'as rien épinglé
 }
 function basculerVitrine(id) {
-  let v = (vitrine() || []).slice();
+  let v = vitrineValide().slice();
   v = v.includes(id) ? v.filter(x => x !== id) : v.concat(id);
   if (v.length > 3) { toast('3 badges maximum à côté de la jauge : retire-en un d\'abord'); return; }
   setPref('jeu', Object.assign({}, getPref('jeu', {}) || {}, { vitrine: v })); rendre(true); if (S.form && S.form.mode === 'vitrine') rendreVitrine();
@@ -2963,15 +3261,27 @@ function pauserHorsEcran(racine) {
 }
 function rendreVideotheque() {
   const e = etatJeu(), L = e.succes.slice().sort((a, b) => (b.ok - a.ok) || (DN[a.d] - DN[b.d]));
-  $('#sheetIn').innerHTML = enteteSheet('TA VIDÉOTHÈQUE · ' + e.succes.filter(s => s.ok).length + '/' + e.succes.length, null) + `<div class="vidtop"><span>Touche une affiche pour la voir en grand</span><button class="pinchip" data-act="vitrine">📌 ${(vitrine() || []).length}/3 au profil</button></div>
+  $('#sheetIn').innerHTML = enteteSheet('TA VIDÉOTHÈQUE · ' + e.succes.filter(s => s.ok).length + '/' + e.succes.length, null) + `<div class="vidtop"><span>Touche une affiche pour la voir en grand</span><button class="pinchip" data-act="vitrine">📌 ${vitrineValide().length}/3 au profil</button></div>
     <div class="vidgrid">${L.map(s => `<button data-act="plein" data-id="${s.id}">${affiche(s.id, DN[s.d], 72, !s.ok)}${s.ok && epingle('s:' + s.id) ? '<i class="pinmk">📌</i>' : ''}<small>${esc(s.nom)}</small><em>${s.ok ? CADRES.a[DN[s.d]] : s.cur + '/' + s.max}</em></button>`).join('')}</div>`;
   pauserHorsEcran($('#sheetIn'));
 }
 // Affiche en plein écran : titre, comment l'obtenir, et l'épingler au profil
 function ouvrirPlein(id) {
-  const e = etatJeu(), s = e.succes.find(x => x.id === id); if (!s) return;
   let o = $('#plein'); if (!o) { o = document.createElement('div'); o.id = 'plein'; document.body.appendChild(o); }
-  const ep = epingle('s:' + s.id), n = (vitrine() || []).length, fmt = CADRES.a[DN[s.d]];
+  if (String(id).startsWith('e:')) { // écusson d'événement (gagné) : même plein écran
+    const b = badgesGagnes().find(x => x.id === id); if (!b) return;
+    const ep = epingle(id), n = vitrineValide().length, d = EVENEMENTS.find(x => x.id === id.slice(2)), sx = SAISONS_FIXES.concat(SAISONS_EV).find(x => x.id === id.slice(2));
+    const rar = RAR[(d || sx || { rar: 'commune' }).rar], inst = d ? (etatJeu().f.evOk || []).filter(x => x.def.id === d.id).pop() : null; // texte de la dernière réussite
+    o.innerHTML = `<div class="plbox"><button class="plx" data-act="plein-x" aria-label="Fermer">✕</button>
+      <div class="plaf">${b.r(Math.min(300, Math.round(innerWidth * .72)))}</div>
+      <h3>${esc(b.nom)}</h3>
+      <button class="plpin ${ep ? 'on' : ''}" data-act="plein-pin" data-id="${esc(id)}">${ep ? '📌 ÉPINGLÉ AU PROFIL · RETIRER' : n >= 3 ? '📌 PROFIL COMPLET (3/3) · TOUCHE POUR GÉRER' : '📌 ÉPINGLER AU PROFIL (' + n + '/3)'}</button>
+      ${inst ? `<p>${esc(inst.txt)}</p>` : sx && sx.txt ? `<p>${esc(sx.txt)}</p>` : ''}
+      <div class="plmeta">ÉCUSSON ${CADRES.e[rar.n]} · ${rar.l}${b.n > 1 ? ' · ×' + b.n : ''}</div></div>`;
+    o.classList.add('on'); return;
+  }
+  const e = etatJeu(), s = e.succes.find(x => x.id === id); if (!s) return;
+  const ep = epingle('s:' + s.id), n = vitrineValide().length, fmt = CADRES.a[DN[s.d]];
   o.innerHTML = `<div class="plbox"><button class="plx" data-act="plein-x" aria-label="Fermer">✕</button>
     <div class="plaf">${affiche(s.id, DN[s.d], Math.min(300, Math.round(innerWidth * .72)), !s.ok)}</div>
     <h3>${esc(s.nom)}</h3>
@@ -2985,12 +3295,12 @@ function ouvrirPlein(id) {
 function fermerPlein() { const o = $('#plein'); if (o) o.classList.remove('on'); }
 function blocVideotheque(e) {
   const ok = e.succes.filter(s => s.ok), der = ok.slice(-4).reverse(), prochains = e.succes.filter(s => !s.ok).sort((a, b) => b.cur / b.max - a.cur / a.max).slice(0, 4 - der.length);
-  return `<button class="vidban" data-act="videotheque"><div class="vidh"><b>🎬 TA VIDÉOTHÈQUE <span class="pinchip" data-act="vitrine" role="button">📌 ${(vitrine() || []).length}/3 au profil</span></b><span>${ok.length}/${e.succes.length} affiches ›</span></div><div class="vidrow">${der.map(s => affiche(s.id, DN[s.d], 58)).join('')}${prochains.map(s => affiche(s.id, DN[s.d], 58, true)).join('')}</div></button>`;
+  return `<button class="vidban" data-act="videotheque"><div class="vidh"><b>🎬 TA VIDÉOTHÈQUE <span class="pinchip" data-act="vitrine" role="button">📌 ${vitrineValide().length}/3 au profil</span></b><span>${ok.length}/${e.succes.length} affiches ›</span></div><div class="vidrow">${der.map(s => affiche(s.id, DN[s.d], 58)).join('')}${prochains.map(s => affiche(s.id, DN[s.d], 58, true)).join('')}</div></button>`;
 }
 function rendreVitrine() {
   const G = badgesGagnes(), v = vitrine() || [];
   $('#sheetIn').innerHTML = enteteSheet('BADGES À CÔTÉ DE LA JAUGE', null) + `<div class="note" style="display:block;margin-top:10px">Touche un badge pour l'afficher ou le retirer (3 maximum).</div>
-    ${G.length ? `<div class="vitgrid">${G.map(b => `<button class="${v.includes(b.id) ? 'on' : ''}" data-act="vit" data-id="${b.id}">${b.r(60)}<small>${esc(b.nom)}</small><em>${v.includes(b.id) ? '✓ AFFICHÉ' : 'AFFICHER'}</em></button>`).join('')}</div>${G.filter(b => b.amb).map(b => `<button class="ghost" data-act="amb-go" data-a="${b.amb}" style="margin-top:8px">🎨 APPLIQUER L'AMBIANCE « ${esc(b.nom.toUpperCase())} »</button>`).join('')}` : '<div class="note" style="display:block">Aucun badge gagné pour l\'instant.</div>'}
+    ${G.length ? `<div class="vitgrid">${G.map(b => `<div class="vitc"><button class="${v.includes(b.id) ? 'on' : ''}" data-act="vit" data-id="${b.id}">${b.r(60)}<small>${esc(b.nom)}</small><em>${v.includes(b.id) ? '✓ AFFICHÉ' : 'AFFICHER'}</em></button><button class="vitbig" data-act="plein" data-id="${b.id.startsWith('s:') ? b.id.slice(2) : b.id}">VOIR EN GRAND</button></div>`).join('')}</div>${G.filter(b => b.amb).map(b => `<button class="ghost" data-act="amb-go" data-a="${b.amb}" style="margin-top:8px">🎨 APPLIQUER L'AMBIANCE « ${esc(b.nom.toUpperCase())} »</button>`).join('')}` : '<div class="note" style="display:block">Aucun badge gagné pour l\'instant.</div>'}
     ${v.length ? `<button class="ghost" data-act="vit-vider" style="margin-top:12px">NE PLUS RIEN AFFICHER</button>` : ''}`;
   pauserHorsEcran($('#sheetIn'));
 }
@@ -3106,14 +3416,14 @@ function blocBadgesEv(e) {
     <div class="note" style="display:block;margin-top:8px">Les événements éclair apparaissent certaines semaines, sans prévenir. Réussi : le badge est à toi (et compte en double si tu le regagnes). Raté : rien, il faudra attendre qu'il revienne.</div>`;
 }
 function annoncerEv() {
-  if (!ouvert('saison')) return;
+  if (!ouvert('saison')) return null;
   const L = planEvenements().map(etatEv), vus = LS.get('evVus', null), gagnes = LS.get('evGagnes', null);
   if (vus === null || gagnes === null) { LS.set('evVus', L.filter(x => x.fin < auj()).map(x => x.cle)); LS.set('evGagnes', L.filter(x => x.ok && x.fin < auj()).map(x => x.cle)); }
   const V = LS.get('evVus', []), G = LS.get('evGagnes', []);
-  const neuf = L.find(x => !V.includes(x.cle) && x.statut === 'cours'), gagne = L.find(x => x.ok && !G.includes(x.cle));
-  if (gagne) { LS.set('evGagnes', G.concat(gagne.cle).slice(-200)); celebrer(); toast('🏅 Badge « ' + gagne.def.nom + ' » gagné (+' + RAR[gagne.def.rar].xp + ' XP)', 'VOIR', () => { S.tab = 'stats'; S.statsVue = 'progres'; S.progT = 'succes'; rendre(); scrollTo(0, 0); }); }
-  else if (neuf) toast('⚡ Nouvel événement : ' + neuf.def.nom, 'VOIR', () => { S.tab = 'stats'; S.statsVue = 'progres'; S.progT = 'defis'; rendre(); scrollTo(0, 0); });
-  if (neuf || gagne) LS.set('evVus', [...new Set(V.concat(L.filter(x => x.statut === 'cours' || x.fin < auj()).map(x => x.cle)))].slice(-200));
+  const neuf = L.find(x => !V.includes(x.cle) && x.statut === 'cours'), nouv = L.filter(x => x.ok && !G.includes(x.cle));
+  if (nouv.length) LS.set('evGagnes', G.concat(nouv.map(x => x.cle)).slice(-200));
+  if (neuf || nouv.length) LS.set('evVus', [...new Set(V.concat(L.filter(x => x.statut === 'cours' || x.fin < auj()).map(x => x.cle)))].slice(-200));
+  return { gagnes: nouv, neuf }; // annoncés ensemble dans la carte des gains (annoncerGains), plus par des toasts qui s'écrasent
 }
 // --- Mission du mois : tirée au sort pour chaque mois (même tirage sur tous tes appareils) ---
 const MISSIONS = [
@@ -3128,7 +3438,8 @@ function missionDe(y, m) {
   let i = tirageMission(y, m); const [py, pm] = reculer(y, m); if (i === tirageMission(py, pm)) i = (i + 1) % MISSIONS.length; // jamais deux fois la même d'affilée
   const mi = Object.assign({}, MISSIONS[i]);
   if (mi.id === 'baisse') {
-    const ex = exclusSerie(), top = cats().filter(c => estCourante(c.nom) && !ex.includes(c.nom)).map(c => ({ n: c.nom, v: depenseMois(c.nom, py, pm) })).sort((a, b) => b.v - a.v)[0];
+    const ex = exclusSerie(), G = [...new Set(cats().filter(c => estCourante(c.nom) && !ex.includes(c.nom)).map(c => familleJeu(c.nom)))]; // famille du jeu = une seule ligne
+    const top = G.map(n => ({ n, v: depMoisJeu(n, py, pm) })).sort((a, b) => b.v - a.v)[0];
     if (!top || top.v < 20) return Object.assign({}, MISSIONS[1]);
     mi.cat = top.n; mi.ref = top.v; mi.txt = mi.txt.replace('{cat}', top.n).replace('{v}', e0(top.v));
   }
@@ -3142,7 +3453,7 @@ function etatMission(y, m) {
   if (mi.id === 'we') { const JA = joursJeu(), pos = new Map(JA.map((x, i) => [x[0], i])); cur = J.some(x => { const n = JA[pos.get(x[0]) + 1]; return new Date(x[0] + 'T00:00:00').getDay() === 6 && x[1] === true && n && n[1] === true; }) ? 1 : 0; }
   else if (mi.id === 'j8') cur = J.filter(x => x[1] === true).length;
   else if (mi.id === 's5') cur = maxSerie(J.map(x => x[1]));
-  else if (mi.id === 'baisse') { mi.dep = depenseMois(mi.cat, y, m); cur = st === 'passe' && mi.dep < mi.ref - 0.005 ? 1 : 0; }
+  else if (mi.id === 'baisse') { mi.dep = depMoisJeu(mi.cat, y, m); cur = st === 'passe' && mi.dep < mi.ref - 0.005 ? 1 : 0; }
   const ok = cur >= mi.max;
   return Object.assign(mi, { cur: Math.min(cur, mi.max), ok, rate: !ok && st === 'passe', y, m });
 }
@@ -3441,7 +3752,22 @@ const ICO_COSM = { ambiance: '🌅', ui: '🖥️', theme: '🎨', texte: '🔤'
 const TYPES_COSM = [['ambiance', 'AMBIANCE'], ['ui', 'INTERFACE'], ['theme', 'COULEURS'], ['texte', 'POLICE'], ['skin', 'JAUGES'], ['accent', 'ACCENT'], ['aiguille', 'AIGUILLES'], ['tampon', 'TAMPONS'], ['police', 'CHIFFRES'], ['fete', 'FÊTES'], ['son', 'SON'], ['ticket', 'TICKET'], ['mascotte', 'MASCOTTE'], ['titre', 'TITRE']];
 const cleCos = t => t === 'skin' ? 'skin' : t === 'accent' ? 'accent' : 'cos_' + t;
 const defCos = t => ({ ambiance: 'aucune', ui: 'papier', texte: 'auto', skin: 'classique', accent: 'foret', theme: 'defaut', mascotte: 'off', tampon: 'encre', police: 'mono', fete: 'confettis', son: 'off', aiguille: 'classique', ticket: 'thermique', titre: '' })[t];
-const cos = t => on('jeu') ? LS.get(cleCos(t), defCos(t)) : defCos(t);
+// Un cosmétique équipé qui n'est plus débloqué (niveau ou succès perdu) revient au réglage par défaut, sans effacer le choix :
+// il revient tout seul s'il est regagné. Avant le chargement des données, on garde le choix (pas de clignotement).
+function cosDebloque(t, id) {
+  if (!S.data || id === defCos(t)) return true;
+  try { const o = tousCosm().find(x => x.t === t && x.id === id); return !o || debloque(o, etatJeu().niv); } catch (e) { return true; }
+}
+const cos = t => { if (!on('jeu')) return defCos(t); const v = LS.get(cleCos(t), defCos(t)); return cosDebloque(t, v) ? v : defCos(t); };
+// Titre choisi, s'il est encore débloqué (niveau ou étoiles de prestige)
+function titreCos(e) {
+  const t = LS.get('cos_titre', ''), k = TITRES.indexOf(t), p = PRESTIGE_TITRES.find(x => x[1] === t);
+  return t && ((k >= 0 && e.niv >= k + 1) || (p && e.prest >= p[0])) ? t : e.titre;
+}
+// Ré-applique les cosmétiques quand l'un d'eux devient (ou redevient) indisponible
+var cosSigApplique = null; // var : lisible dès le tout premier appliquerCosmetiques()
+const sigCos = () => TYPES_COSM.map(([t]) => t === 'titre' ? '' : cos(t)).join('|');
+function verifierCosmetiques() { if (sigCos() !== cosSigApplique) try { appliquerCosmetiques(); } catch (e) {} }
 function tousCosm() {
   const L = SKINS.map(o => Object.assign({ t: 'skin' }, o)).concat(ACCENTS.map(o => Object.assign({ t: 'accent' }, o)));
   return dispo('cosmetiques') ? L.concat(COSM_EXTRA, UI_SKINS, TEXTES) : L;
@@ -3458,6 +3784,7 @@ function appliquerCosmetiques() {
   d.amb = cos('ambiance'); if (d.amb && d.amb !== 'aucune') d.theme = AMB_SOMBRES.includes(d.amb) ? 'dark' : 'light'; // l'ambiance prend le pas sur les couleurs
   const mt = document.querySelector('meta[name=theme-color]'); if (mt && (sombre || clair || d.amb !== 'aucune')) mt.content = getComputedStyle(document.documentElement).getPropertyValue('--nav').trim() || mt.content;
   try { appliquerAccent(); } catch (e) {}
+  try { cosSigApplique = sigCos(); } catch (e) {}
 }
 // --- Fêtes ---
 function celebrer() {
@@ -3537,7 +3864,7 @@ function blocCollection(e) {
   const n = L.filter(o => debloque(o, e.niv)).length;
   let h = `<div class="sec"><span>COLLECTION</span><span>${n}/${L.length}${nouveaux.length ? ' · <b class="nouv">' + nouveaux.length + ' NOUVEAU' + (nouveaux.length > 1 ? 'X' : '') + '</b>' : ''}</span></div>
     <div class="cgrid">${(() => {
-      const cur = LS.get('cos_titre', '') || e.titre, nT = TITRES.filter((x, k) => e.niv >= k + 1).length + PRESTIGE_TITRES.filter(x => e.prest >= x[0]).length;
+      const cur = titreCos(e), nT = TITRES.filter((x, k) => e.niv >= k + 1).length + PRESTIGE_TITRES.filter(x => e.prest >= x[0]).length;
       const tuile = ([t, l]) => { const Lt = L.filter(o => o.t === t), u = Lt.filter(o => debloque(o, e.niv)).length;
         return `<button class="${T === t ? 'on' : ''}" data-act="colt" data-t="${t}"><span>${ICO_COSM[t] || '✨'}</span>${l}<small>${u}/${Lt.length}</small>${nouveaux.some(o => o.t === t) ? '<i></i>' : ''}</button>`; };
       return `<button class="ctitre ${T === 'titre' ? 'on' : ''}" data-act="colt" data-t="titre"><span>👑</span><div><small>TITRE · ${nT}/${TITRES.length + PRESTIGE_TITRES.length}</small><b>${esc(cur.toUpperCase())}</b></div><em>CHANGER ›</em></button>`
@@ -3545,11 +3872,11 @@ function blocCollection(e) {
     })()}</div>
     <div class="grp" style="margin:4px 0 8px">${esc((TYPES_COSM.find(x => x[0] === T) || ['', ''])[1])}</div>`;
   if (T === 'titre') {
-    const cur = LS.get('cos_titre', '') || e.titre;
+    const cur = titreCos(e);
     return h + `<div class="chips">${TITRES.map((ti, k) => { const u = e.niv >= k + 1; return `<button class="chip ${cur === ti ? 'on' : ''}" data-act="${u ? 'titre' : 'lock'}" data-t="${esc(ti)}" data-niv="${k + 1}" style="${u ? '' : 'opacity:.4'}">${u ? '' : '🔒 '}${esc(ti)}</button>`; }).join('')}</div>
       <div class="grp" style="margin-top:12px">TITRES DE PRESTIGE</div><div class="chips">${PRESTIGE_TITRES.map(([n, ti]) => { const u = e.prest >= n; return `<button class="chip pchip ${cur === ti ? 'on' : ''}" data-act="${u ? 'titre' : 'lock'}" data-t="${esc(ti)}" data-prest="${n}" style="${u ? '' : 'opacity:.4'}">${u ? '★ ' : '☆' + n + ' '}${esc(ti)}</button>`; }).join('')}</div>`;
   }
-  const sel = LS.get(cleCos(T), defCos(T));
+  const sel = cos(T); // un choix devenu indisponible s'affiche comme le réglage par défaut
   if (T === 'ui') chargerPolices([].concat(...UI_SKINS.map(o => o.f))); if (T === 'texte') chargerPolices(TEXTES.map(o => o.ff).filter(Boolean));
   if (T === 'ui' || T === 'texte' || T === 'theme' || T === 'ambiance') h += `<div class="note" style="display:block;margin:0 0 8px">Touche un style verrouillé pour l'essayer 4 secondes.</div>`;
   h += `<div class="coll ${T === 'skin' ? 'c3' : ''}">`;
@@ -3871,6 +4198,7 @@ document.addEventListener('click', ev => {
   if (a.startsWith('mg:m:')) { S.y = S.form.y; S.m = +a.slice(5); fermer(); rendre(); return; }
   if (a.startsWith('fj:')) { const f = S.form, d = +a.slice(3); f.jour = f.jour == null ? (d > 0 ? 1 : 31) : (f.jour + d < 1 || f.jour + d > 31 ? null : f.jour + d); rendreForm(); return; }
   if (a.startsWith('fm:')) { const f = S.form, d = +a.slice(3); let m = f.m + d, y = f.y; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; } f.y = y; f.m = m; f.date = dateDefaut(y, m); rendreForm(); return; }
+  if (a.startsWith('ret-d:')) { const f = S.form; let x = addJ(f.rd || auj(), +a.slice(6)); const mn = retraitMin(); if (x < mn) x = mn; if (x > auj()) x = auj(); f.rd = x; rendreSolde(); return; }
   if (a.startsWith('fd:')) { const f = S.form, d = +a.slice(3); let x = addJ(f.date || dateDefaut(f.y, f.m) || auj(), d); const deb = f.y + '-' + pad2(f.m) + '-01', fin = f.y + '-' + pad2(f.m) + '-' + pad2(dim(f.y, f.m)), max = f.mode === 'edit' && fin > auj() ? auj() : fin; // après aujourd'hui = achat à venir (seulement pour une nouvelle ligne)
     if (x < deb) x = deb; if (x > max) x = max; f.date = x; rendreForm(); return; }
   switch (a) {
@@ -3907,6 +4235,7 @@ document.addEventListener('click', ev => {
     case 'al-ok': LS.set('alertesVues', LS.get('alertesVues', []).concat(el.dataset.id).slice(-200)); rendre(true); break;
     case 'allalertes': S.allAlertes = !S.allAlertes; rendre(true); break;
     case 'ptab': S.progT = el.dataset.t; LS.set('progT', S.progT); rendre(true); scrollTo(0, Math.min(scrollY, ($('.ptabs') || { offsetTop: 0 }).offsetTop - 60)); break;
+    case 'go-defis': fermer(); S.tab = 'stats'; S.statsVue = 'progres'; S.progT = 'defis'; LS.set('progT', 'defis'); rendre(); scrollTo(0, 0); break;
     case 'go-succes': fermer(); S.tab = 'stats'; S.statsVue = 'progres'; S.progT = 'succes'; LS.set('progT', 'succes'); rendre(); scrollTo(0, 0); break;
     case 'xpinfo': S.form = { mode: 'xpinfo' }; rendreForm(); ouvrirSheet(); break;
     case 'xpjournal': S.form = { mode: 'xplog' }; rendreForm(); ouvrirSheet(); $('#sheet').scrollTop = 0; break;
@@ -3922,7 +4251,7 @@ document.addEventListener('click', ev => {
     case 'vit': basculerVitrine(el.dataset.id); break;
     case 'plein': ouvrirPlein(el.dataset.id); break;
     case 'plein-x': fermerPlein(); break;
-    case 'plein-pin': { const id = 's:' + el.dataset.id; if (!epingle(id) && (vitrine() || []).length >= 3) { fermerPlein(); S.form = { mode: 'vitrine' }; rendreForm(); ouvrirSheet(); break; }
+    case 'plein-pin': { const id = el.dataset.id.startsWith('e:') ? el.dataset.id : 's:' + el.dataset.id; if (!epingle(id) && vitrineValide().length >= 3) { fermerPlein(); S.form = { mode: 'vitrine' }; rendreForm(); ouvrirSheet(); break; }
       basculerVitrine(id); ouvrirPlein(el.dataset.id); if (S.form && S.form.mode === 'videotheque') rendreVideotheque(); break; }
     case 'dmsg': if (el.dataset.m) toast(el.dataset.m); break;
     case 'anom-voulu': { const e = trouver(el.dataset.id); if (!e) break; const avant = e.lib, i0 = el.dataset.i;
@@ -4033,13 +4362,20 @@ document.addEventListener('click', ev => {
     case 'cat-del': retirerCat(); break;
     case 's-neg': S.form.neg = !S.form.neg; rendreSolde(); break;
     case 's-ok': okSolde(); break;
+    case 'esp': S.form.especes = !S.form.especes; rendreForm(); break;
+    case 'ret-go': ouvrirSolde(); S.form.ret = true; rendreForm(); setTimeout(() => { const i = $('#rm'); if (i) i.focus(); }, 50); break;
+    case 'ret-open': S.form.ret = true; rendreSolde(); setTimeout(() => { const i = $('#rm'); if (i) i.focus(); }, 50); break;
+    case 'ret-x': S.form.ret = false; S.form.rm = ''; rendreSolde(); break;
+    case 'ret-ok': okRetrait(); break;
+    case 'ret-del': supprRetrait(+el.dataset.i); break;
     case 'theme': LS.set('theme', el.dataset.t); appliquerTheme(); rendreReglages(); break;
     case 'refresh': fermer(); rafraichir(true); toast('Actualisation…'); break;
     case 'file': S.form = { mode: 'file', arm: false }; rendreForm(); ouvrirSheet(); break;
     case 'rejet-renvoyer': rejetRenvoyer(+el.dataset.i); rendreFile(); toast('Renvoi en cours…'); break;
     case 'rejet-suppr': { const rj = LS.get('rejets', []); rj.splice(+el.dataset.i, 1); LS.set('rejets', rj); rendreFile(); rendre(true); } break;
-    case 'file-retry': if (!S.busy) pomper(); toast('Nouvel essai…'); setTimeout(() => { if (S.form && S.form.mode === 'file') rendreFile(); }, 4000); break;
-    case 'file-drop': if (!S.form.arm) { S.form.arm = true; rendreFile(); break; } { const o = S.queue.shift(); const e = o && trouver(o.id); if (e) e.pending = false; sauver(); S.form.arm = false; rendreFile(); rendre(true); toast('Envoi abandonné : à ressaisir si besoin'); } break;
+    case 'file-retry': S.queue.forEach(o => { o.prochain = 0; }); if (!S.busy) pomper(); toast('Nouvel essai…'); setTimeout(() => { if (S.form && S.form.mode === 'file') rendreFile(); }, 4000); break;
+    case 'file-drop': { const i = +el.dataset.i, o = S.queue[i]; if (!o || enVol(o)) { S.form.arm = false; rendreFile(); break; } if (S.form.arm !== o) { S.form.arm = o; rendreFile(); break; }
+      S.queue.splice(i, 1); const e = trouver(o.id); if (e && !S.queue.some(q => q.id === e.id)) e.pending = false; sauver(); S.form.arm = false; rendreFile(); rendre(true); toast('Envoi abandonné : à ressaisir si besoin'); pomper(); } break;
     case 'logout': if (!S.form.armOut) { S.form.armOut = true; rendreReglages(); } else { fermer(); oublierCompte(); rendre(); verrouiller(); } break;
     case 'go:lien': S.form = { mode: 'lien', url: S.api }; rendreForm(); break;
     case 'lien-ok': okLien(); break;

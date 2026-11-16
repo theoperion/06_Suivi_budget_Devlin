@@ -1,5 +1,5 @@
 /**
- * BUDGET · API du budget de Devlin (Apps Script) · v5.10
+ * BUDGET · API du budget de Devlin (Apps Script) · v5.11
  * ------------------------------------------
  * Ce script est relié au fichier budget dans lequel il a été créé.
  * Il lit les Paramètres, l'Échéancier et le Journal, et écrit dans le Journal.
@@ -11,12 +11,15 @@
  * v5.2 : la date de la dépense (colonne « Saisi le ») se modifie aussi quand on corrige une ligne.
  * v5.3 : fonction verifier() pour donner les autorisations et tester le script en un clic.
  * v5.6 : « À venir » : le mois est écrit en texte (corrige l'échec des éléments à venir).
+ * v5.11 : action « lot » : plusieurs envois en une demande (un seul verrou) ; un envoi refusé n'empêche pas les suivants.
  * v5.10 : « À venir » accepte un mois futur pas encore présent dans la liste du Journal.
  * v5.9 : renommer une catégorie met aussi à jour le défi du mois ; on ne peut plus retirer une catégorie encore utilisée dans « À venir ».
  * v5.8 : classeur ouvert une seule fois par demande ; onglet caché « Diagnostic » (durée et résultat de chaque demande).
  * v5.7 : fichier occupé → réponse OCCUPE (l'appli réessaie) au lieu d'une erreur qui faisait perdre la saisie.
  * v5.5 : chaque appel est noté dans Apps Script › Exécutions (action, résultat, erreur) pour diagnostiquer.
  * v5.4 : la colonne « Contrôle » du Journal ignore les lignes validées « c'est voulu » (libellé terminé par ✓). Mise à jour automatique, une seule fois.
+ * Espèces : colonne « Payé en » du Journal (N par défaut) = « Espèces » pour une dépense payée en liquide ;
+ *           préférence « especes » = espèces déclarées au dernier contrôle + retraits au distributeur depuis.
  *
  * Installation :
  *  1. Remplace CLE_A_ENREGISTRER par ta clé, lance initialiserCle() une fois (inutile si c'est déjà fait).
@@ -25,7 +28,7 @@
  */
 
 const CLE_A_ENREGISTRER = 'CHANGE-MOI';
-const VERSION_API = '5.10';
+const VERSION_API = '5.11';
 
 // Laisse vide si le script est ouvert depuis le fichier (Extensions > Apps Script).
 const ID_FICHIER = '1TFXRVMLuVv_NauUH7VyJ4Pgd-Us5JuD3_3lzN_ojfvQ'; // fichier budget de Devlin
@@ -68,8 +71,10 @@ function doPost(e) {
     out = { ok: false, error: 'SERVEUR', message: String(err && err.message || err) };
     console.error('Erreur ' + action + ' : ' + out.message + (err && err.stack ? '\n' + err.stack : ''));
   }
-  try { if (action !== 'data') console.log(action + ' → ' + (out && out.ok ? 'ok' : 'refusé : ' + (out && out.message))); } catch (x) {}
-  diagnostic_(action, Date.now() - t0, out);
+  // Un lot : une ligne avec le nombre d'envois et d'échecs (le détail de chaque échec va dans « Détail »).
+  const nom = action === 'lot' && out && out.ok && out.detail ? 'lot (' + out.detail.ops + ' envois, ' + out.detail.echecs + ' échec' + (out.detail.echecs > 1 ? 's' : '') + ')' : action;
+  try { if (action !== 'data') console.log(nom + ' → ' + (out && out.ok ? 'ok' : 'refusé : ' + (out && out.message))); } catch (x) {}
+  diagnostic_(nom, Date.now() - t0, out);
   if (out && out.detail) delete out.detail;
   let txt; try { txt = JSON.stringify(out); } catch (x) { txt = JSON.stringify({ ok: false, error: 'SERVEUR', message: 'Réponse illisible' }); }
   return ContentService.createTextOutput(txt).setMimeType(ContentService.MimeType.JSON);
@@ -89,26 +94,51 @@ function traiter_(req) {
   if (!cle) return { ok: false, error: 'SANS_CLE', message: 'Clé non configurée : lance initialiserCle() dans Apps Script.' };
   if (!req || req.key !== cle) return { ok: false, error: 'CLE', message: 'Clé incorrecte.' };
 
-  switch (req.action) {
-    case 'data': return { ok: true, data: lireDonnees_() };
-    case 'add': return avecVerrou_(() => ajouter_(req.ligne));
-    case 'update': return avecVerrou_(() => modifier_(req.row, req.attendu, req.ligne));
-    case 'delete': return avecVerrou_(() => supprimer_(req.row, req.attendu));
-    case 'ech-save': return avecVerrou_(() => echEnregistrer_(req.row, req.attendu, req.e));
-    case 'ech-del': return avecVerrou_(() => echSupprimer_(req.row, req.attendu));
-    case 'budget': return avecVerrou_(() => budget_(req.nom, req.budget, req.suivi));
-    case 'cat-add': return avecVerrou_(() => catAjouter_(req.nom, req.groupe, req.budget, req.suivi));
-    case 'cat-edit': return avecVerrou_(() => catModifier_(req.ancien, req.nom, req.groupe));
-    case 'cat-del': return avecVerrou_(() => catRetirer_(req.nom, req.cible));
-    case 'solde-ctrl': return avecVerrou_(() => soldeControle_(req.mois, req.solde, req.especes));
-    case 'solde-dep': return avecVerrou_(() => soldeDepart_(req.annee, req.valeur));
-    case 'av-save': return avecVerrou_(() => avEnregistrer_(req.row, req.attendu, req.a));
-    case 'av-del': return avecVerrou_(() => avSupprimer_(req.row, req.attendu));
-    case 'defi': return avecVerrou_(() => defi_(req.mois, req.cat, req.montant));
-    case 'pref-set': return avecVerrou_(() => prefSet_(req.cle, req.valeur));
-    case 'av-paye': return avecVerrou_(() => avPaye_(req.row, req.attendu, req.ligne));
-    default: return { ok: false, error: 'ACTION', message: 'Action inconnue : ' + req.action };
-  }
+  if (req.action === 'data') return { ok: true, data: lireDonnees_() };
+  if (req.action === 'lot') return avecVerrou_(() => lot_(req.ops));
+  const f = ECRITURES_[req.action];
+  if (!f) return { ok: false, error: 'ACTION', message: 'Action inconnue : ' + req.action };
+  return avecVerrou_(() => f(req));
+}
+
+// Écritures : le corps seul, sans verrou (pris par traiter_ pour un envoi, une seule fois pour un lot).
+const ECRITURES_ = {
+  'add': r => ajouter_(r.ligne),
+  'update': r => modifier_(r.row, r.attendu, r.ligne),
+  'delete': r => supprimer_(r.row, r.attendu),
+  'ech-save': r => echEnregistrer_(r.row, r.attendu, r.e),
+  'ech-del': r => echSupprimer_(r.row, r.attendu),
+  'budget': r => budget_(r.nom, r.budget, r.suivi),
+  'cat-add': r => catAjouter_(r.nom, r.groupe, r.budget, r.suivi),
+  'cat-edit': r => catModifier_(r.ancien, r.nom, r.groupe),
+  'cat-del': r => catRetirer_(r.nom, r.cible),
+  'solde-ctrl': r => soldeControle_(r.mois, r.solde, r.especes),
+  'solde-dep': r => soldeDepart_(r.annee, r.valeur),
+  'av-save': r => avEnregistrer_(r.row, r.attendu, r.a),
+  'av-del': r => avSupprimer_(r.row, r.attendu),
+  'defi': r => defi_(r.mois, r.cat, r.montant),
+  'pref-set': r => prefSet_(r.cle, r.valeur),
+  'av-paye': r => avPaye_(r.row, r.attendu, r.ligne)
+};
+
+// v5.11 : plusieurs envois en une demande, exécutés dans l'ordre sous un seul verrou.
+// Chaque envoi a sa propre réponse ; un envoi refusé ou en erreur n'empêche pas les suivants.
+function lot_(ops) {
+  if (!Array.isArray(ops) || !ops.length || ops.length > 50) return { ok: false, error: 'INVALIDE', message: 'Lot vide ou trop long.' };
+  const erreurs = [];
+  const res = ops.map((op, i) => {
+    const f = op && ECRITURES_[op.action];
+    let r;
+    if (!f) r = { ok: false, error: 'ACTION', message: 'Action inconnue : ' + (op && op.action) };
+    else {
+      try { r = f(op) || { ok: false, error: 'SERVEUR', message: 'Réponse vide' }; }
+      catch (err) { r = { ok: false, error: 'SERVEUR', message: String(err && err.message || err) }; console.error('Erreur lot ' + (op && op.action) + ' : ' + r.message); }
+    }
+    if (!r.ok) erreurs.push({ n: i + 1, action: op && op.action, error: r.error, message: r.message, detail: r.detail });
+    if (r.detail) delete r.detail;
+    return r;
+  });
+  return { ok: true, res, detail: { ops: ops.length, echecs: erreurs.length, actions: ops.map(o => o && o.action).join(','), erreurs } };
 }
 
 /* ---------- Lecture ---------- */
@@ -177,12 +207,16 @@ function lireDonnees_() {
   const nj = nbLignesJournal_(jou);
   const brut = jou.getRange(5, 1, nj, 4).getValues();
   const dates = jou.getMaxColumns() >= COL_DATE ? jou.getRange(5, COL_DATE, nj, 1).getValues() : [];
+  const cp = colPaye_(jou, false);
+  const payes = cp ? jou.getRange(5, cp, nj, 1).getValues() : [];
   const tz = ss.getSpreadsheetTimeZone();
   const journal = [];
   brut.forEach((r, i) => {
     if (r[0] === '' && r[1] === '' && r[2] === '' && r[3] === '') return;
     const d = dates[i] && dates[i][0];
-    journal.push({ row: 5 + i, mois: String(r[0]), lib: String(r[1]), cat: String(r[2]), montant: r[3], date: d instanceof Date ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : null });
+    const l = { row: 5 + i, mois: String(r[0]), lib: String(r[1]), cat: String(r[2]), montant: r[3], date: d instanceof Date ? Utilities.formatDate(d, tz, 'yyyy-MM-dd') : null };
+    if (payes[i] && estEspeces_(payes[i][0])) l.especes = true; // champ ajouté seulement si vrai (réponse compacte)
+    journal.push(l);
   });
 
   const libres = par.getRange('A10:A40').getValues().filter(r => !String(r[0]).trim() || /libre/i.test(String(r[0]))).length;
@@ -242,9 +276,41 @@ function ecrireDate_(jou, row, iso) {
   jou.getRange(row, COL_DATE).setValue(d).setNumberFormat('dd/MM/yyyy');
 }
 
+/* ---------- « Payé en » : dépense payée en espèces (colonne N du Journal, repérée par son en-tête) ---------- */
+
+// La colonne est retrouvée par son titre « Payé en » en ligne 4 (N4 normalement).
+// Si N4 contient déjà autre chose, on prend la première colonne après M dont l'en-tête ET les lignes sont vides :
+// rien d'existant n'est jamais écrasé. Les colonnes A-D (contrôle d'identité) et M (date) ne changent pas.
+const COL_PAYE = 14, TITRE_PAYE = 'Payé en';
+function colPaye_(jou, creer) {
+  const max = jou.getMaxColumns();
+  if (max >= COL_PAYE) {
+    const tetes = jou.getRange(4, COL_PAYE, 1, max - COL_PAYE + 1).getDisplayValues()[0].map(v => String(v).trim());
+    const i = tetes.indexOf(TITRE_PAYE);
+    if (i >= 0) return COL_PAYE + i;
+    if (!creer) return 0;
+    const bloc = jou.getRange(4, COL_PAYE, jou.getMaxRows() - 3, tetes.length).getDisplayValues();
+    for (let k = 0; k < tetes.length; k++) {
+      if (tetes[k] === '' && bloc.every(r => String(r[k]).trim() === '')) { jou.getRange(4, COL_PAYE + k).setValue(TITRE_PAYE); return COL_PAYE + k; }
+    }
+  }
+  if (!creer) return 0;
+  const c = Math.max(max + 1, COL_PAYE);
+  jou.insertColumnsAfter(max, c - max);
+  jou.getRange(4, c).setValue(TITRE_PAYE);
+  return c;
+}
+function estEspeces_(v) { return /^esp[eè]ces$/i.test(String(v).trim()); }
+// Écrit « Espèces » ou vide. Une ligne non payée en espèces ne crée jamais la colonne.
+function ecrirePaye_(jou, row, especes) {
+  const c = colPaye_(jou, !!especes);
+  if (c) jou.getRange(row, c).setValue(especes ? 'Espèces' : '');
+}
+
 /* ---------- Préférences de l'appli (tirelires, voyage, escalier, séries…) gardées dans le script ---------- */
 
-const PREFS_OK_ = ['tirelires', 'voyages', 'escalier', 'semaines', 'objectifs', 'jeu'];
+// « especes » : { depuis, base, deja, r: [{ d, m }] } (suivi des espèces entre deux contrôles du solde)
+const PREFS_OK_ = ['tirelires', 'voyages', 'escalier', 'semaines', 'objectifs', 'jeu', 'especes'];
 function prefs_() {
   const p = PropertiesService.getScriptProperties(), o = {};
   PREFS_OK_.forEach(k => { try { const v = p.getProperty('PREF_' + k); if (v) o[k] = JSON.parse(v); } catch (e) {} });
@@ -324,6 +390,7 @@ function ajouter_(l) {
   if (row > jou.getMaxRows()) jou.insertRowsAfter(jou.getMaxRows(), 100);
   jou.getRange(row, 1, 1, 4).setValues([[l.mois, l.lib || l.cat, l.cat, Math.round(Number(l.montant) * 100) / 100]]);
   ecrireDate_(jou, row, l.date);
+  ecrirePaye_(jou, row, l.especes === true);
   if (cleUid) cache.put(cleUid, String(row), 21600); // mémorisé 6 h
   return { ok: true, row };
 }
@@ -336,6 +403,7 @@ function modifier_(row, attendu, l) {
   if (!identique_(r.getValues()[0], attendu)) return { ok: false, error: 'CHANGE', message: 'La ligne a changé dans le fichier.', detail: { row, fichier: r.getValues()[0].map(String), attendu } };
   r.setValues([[l.mois, l.lib || l.cat, l.cat, Math.round(Number(l.montant) * 100) / 100]]);
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ''))) ecrireDate_(jou, row, l.date); // date de la dépense corrigée dans l'appli
+  if (typeof l.especes === 'boolean') ecrirePaye_(jou, row, l.especes); // une ancienne appli qui n'envoie rien ne touche pas à la colonne
   return { ok: true, row };
 }
 
@@ -343,7 +411,11 @@ function supprimer_(row, attendu) {
   const jou = classeur_().getSheetByName('Journal');
   const r = jou.getRange(row, 1, 1, 4);
   if (!identique_(r.getValues()[0], attendu)) return { ok: false, error: 'CHANGE', message: 'La ligne a changé dans le fichier.', detail: { row, fichier: r.getValues()[0].map(String), attendu } };
-  if (row > 5) jou.deleteRow(row); else { r.clearContent(); if (jou.getMaxColumns() >= COL_DATE) jou.getRange(row, COL_DATE).clearContent(); }
+  if (row > 5) jou.deleteRow(row); else {
+    r.clearContent();
+    if (jou.getMaxColumns() >= COL_DATE) jou.getRange(row, COL_DATE).clearContent();
+    const cp = colPaye_(jou, false); if (cp) jou.getRange(row, cp).clearContent();
+  }
   return { ok: true, row, decale: row > 5 };
 }
 
