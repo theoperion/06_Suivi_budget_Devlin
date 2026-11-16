@@ -1,5 +1,5 @@
 /**
- * BUDGET · API du budget de Devlin (Apps Script) · v5.12
+ * BUDGET · API du budget de Devlin (Apps Script) · v5.13
  * ------------------------------------------
  * Ce script est relié au fichier budget dans lequel il a été créé.
  * Il lit les Paramètres, l'Échéancier et le Journal, et écrit dans le Journal.
@@ -11,6 +11,7 @@
  * v5.2 : la date de la dépense (colonne « Saisi le ») se modifie aussi quand on corrige une ligne.
  * v5.3 : fonction verifier() pour donner les autorisations et tester le script en un clic.
  * v5.6 : « À venir » : le mois est écrit en texte (corrige l'échec des éléments à venir).
+ * v5.13 : une fois, les catégories « Courses » passent en suivi « Sans alerte ».
  * v5.12 : préférence « envies » (liste d'envies) ; colonne « Payé en » accepte aussi « En ligne ».
  * v5.11 : action « lot » : plusieurs envois en une demande (un seul verrou) ; un envoi refusé n'empêche pas les suivants.
  * v5.10 : « À venir » accepte un mois futur pas encore présent dans la liste du Journal.
@@ -31,7 +32,7 @@
  */
 
 const CLE_A_ENREGISTRER = 'CHANGE-MOI';
-const VERSION_API = '5.12';
+const VERSION_API = '5.13';
 
 // Laisse vide si le script est ouvert depuis le fichier (Extensions > Apps Script).
 const ID_FICHIER = '1TFXRVMLuVv_NauUH7VyJ4Pgd-Us5JuD3_3lzN_ojfvQ'; // fichier budget de Devlin
@@ -165,9 +166,22 @@ function diagnostic_(action, ms, out) {
   } catch (e) { /* le diagnostic ne doit jamais bloquer un envoi */ }
 }
 
+// Une seule fois (v5.13) : les courses passent en suivi « Sans alerte » (dépense essentielle, montant variable, hors défis).
+function migrerCoursesSansAlerte_(ss) {
+  const p = PropertiesService.getScriptProperties();
+  if (p.getProperty('MIGR_COURSES') === '1') return;
+  try {
+    const par = ss.getSheetByName('Paramètres'), r = par.getRange('A10:E40'), v = r.getValues(); let n = 0;
+    v.forEach((row, i) => { if (/\bcourses?\b/i.test(String(row[0])) && String(row[4]).trim() !== 'Sans alerte') { par.getRange(10 + i, 5).setValue('Sans alerte'); n++; } });
+    p.setProperty('MIGR_COURSES', '1');
+    console.log('Courses en « Sans alerte » : ' + n + ' catégorie(s)');
+  } catch (e) { /* on réessaiera au prochain chargement */ }
+}
+
 function lireDonnees_() {
   const ss = classeur_();
   majFormules_(ss);
+  migrerCoursesSansAlerte_(ss);
   const par = ss.getSheetByName('Paramètres');
   const ech = ss.getSheetByName('Échéancier');
   const jou = ss.getSheetByName('Journal');
