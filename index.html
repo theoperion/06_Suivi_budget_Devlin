@@ -339,6 +339,7 @@ body.discret .pbh b{filter:blur(7px)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 .bilban{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:8px 0 2px;padding:11px 14px;border-radius:12px;color:#fff;background:linear-gradient(90deg,#1D9E75,#2B7FD8,#7B5BD6,#D85A30);background-size:200% 100%;animation:bshift 6s ease-in-out infinite alternate}
 .bilban>span:nth-child(2){flex:1;min-width:0}.bilban b{display:block;font-family:var(--mono);font-size:12.5px;letter-spacing:1.2px}.bilban small{display:block;font-size:12px;opacity:.9}
+.debm{border:1.5px solid var(--ink);border-radius:12px;padding:6px 12px 4px;margin:8px 0 4px;background:var(--card)}.dmh{display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:1.2px;font-weight:600}.dmi{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 0;border-top:1px dashed var(--rule)}.dmi>span:nth-child(2){flex:1;min-width:0}.dmi b{display:block;font-size:13.5px;font-weight:600}.dmi small{display:block;font-size:11.5px;color:var(--ink3)}.dmi>span:last-child{color:var(--ink3);font-size:18px}.dmc{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--ink3);display:flex;align-items:center;justify-content:center;font-size:12px;flex:none}.dmi.fait b{text-decoration:line-through;opacity:.55}.dmi.fait .dmc{background:var(--ok);border-color:var(--ok);color:#fff}.consl{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--rule);font-size:13px}.consl>div{flex:1;min-width:0}.consl .chip{flex:none;white-space:nowrap}
 .bilban .bbp{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:12px;flex:none}.bilban>span:last-child{font-size:22px;opacity:.85}
 @keyframes bshift{to{background-position:100% 0}}
 .soon{width:100%;text-align:left}.soon:active{background:var(--soft)}
@@ -767,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.10';
+const VERSION = '9.11';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1526,17 +1527,51 @@ function blocAnomalies() {
     return `<li><span>${esc(i)}</span>${e ? `<small>${esc(e.lib)} · ${e2(e.montant)} € · ${esc(e.mois)}</small>` : ''}<div class="anomacts">${act}</div></li>`; };
   if (vis.length) h += `<div class="alert"><button data-act="anom" style="display:block;width:100%;text-align:left"><b style="font-weight:600">⚠ ${vis.length} ANOMALIE${vis.length > 1 ? 'S' : ''} À VÉRIFIER</b><span class="muted"> · ${S.anomOpen ? 'masquer' : 'voir'}</span></button>${S.anomOpen ? '<ul class="anoml">' + vis.map(ligneAnom).join('') + '</ul><div class="note" style="display:block;margin-top:6px">« C\'est voulu » ajoute ✓ à la fin du libellé : le fichier ne signale plus cette ligne.</div>' : ''}</div>`;
   const fait = LS.get('ctrlFait', 0) === nowYM(), vus = LS.get('rappelsVus', []);
-  rap.forEach(r => { const k = nowYM() + '|' + r; if (vus.includes(k) || (/solde/i.test(r) && fait)) return;
+  const dm = !!etatDebutMois(); rap.forEach(r => { const k = nowYM() + '|' + r; if (vus.includes(k) || (/solde/i.test(r) && (fait || dm))) return;
     h += `<div class="rap">${/solde/i.test(r) ? `<button class="note" data-act="ctrl" style="flex:1;text-align:left;margin:0">${ico.cal}<span>Nouveau mois : note ton solde bancaire <b style="font-weight:500;color:var(--ink);text-decoration:underline">C'est parti ›</b></span></button>` : `<div class="note" style="flex:1;margin:0">${ico.cal}<span>${esc(r.replace(/^Rappel[^:]*:\s*/, ''))}</span></div>`}<button class="rapx" data-act="rap-ok" data-k="${esc(k)}" aria-label="Masquer ce rappel">✕</button></div>`; });
   return h;
 }
+// (9.11) Début de mois : une carte « Nouveau mois » qui regroupe le bilan du mois passé, les conseils de budgets
+// et le contrôle du solde (du 1er au 7, tant que tout n'est pas fait ou que la carte n'est pas fermée).
+function etatDebutMois() {
+  if (statut(S.y, S.m) !== 'cours' || now.getDate() > 7 || LS.get('debMoisVu', 0) === nowYM()) return null;
+  const t = nowYM() - 1, y = Math.floor((t - 1) / 12), m = ((t - 1) % 12) + 1, cle = y + '-' + m, c = calc(y, m);
+  const bil = on('bilan') && (c.rev || c.dep) ? { y, m, cle, ok: LS.get('bilanVu', '') === cle, restant: c.restant } : null;
+  const nc = conseilsBudgets().length, bud = { n: nc, ok: !nc || LS.get('conseilsVu', 0) === nowYM() };
+  const sol = { ok: LS.get('ctrlFait', 0) === nowYM() };
+  if ((!bil || bil.ok) && bud.ok && sol.ok) return null;
+  return { bil, bud, sol };
+}
 function carteBilanMois() {
-  if (!on('bilan')) return '';
-  if (statut(S.y, S.m) !== 'cours' || now.getDate() > 5) return '';
-  const t = nowYM() - 1, y = Math.floor((t - 1) / 12), m = ((t - 1) % 12) + 1, cle = y + '-' + m;
-  if (LS.get('bilanVu', '') === cle) return '';
-  const c = calc(y, m); if (!c.rev && !c.dep) return '';
-  return `<button class="bilban" data-act="bil-ban" data-key="${cle}" data-y="${y}" data-m="${m}"><span class="bbp">▶</span><span><b>TON BILAN ${esc(MOIS[m - 1].toUpperCase())} EST PRÊT</b><small>${c.restant >= 0 ? '+' : ''}${e0(c.restant)} · touche pour l'ouvrir</small></span><span>›</span></button>`;
+  const E = etatDebutMois(); if (!E) return '';
+  const it = (ok, act, data, titre, sous) => `<button class="dmi ${ok ? 'fait' : ''}" data-act="${act}" ${data}><span class="dmc">${ok ? '✓' : ''}</span><span><b>${titre}</b><small>${sous}</small></span><span>›</span></button>`;
+  let h = `<div class="debm"><div class="dmh"><span>NOUVEAU MOIS · ${esc(MOIS[now.getMonth()].toUpperCase())}</span><button class="ibtn" data-act="debm-x" aria-label="Fermer">${ico.x}</button></div>`;
+  if (E.bil) h += it(E.bil.ok, 'bil-ban', `data-key="${E.bil.cle}" data-y="${E.bil.y}" data-m="${E.bil.m}"`, 'Ton bilan de ' + esc(MOIS[E.bil.m - 1].toLowerCase()), (E.bil.restant >= 0 ? 'fini à +' : 'fini à ') + e0(E.bil.restant) + ' · le récap en images');
+  h += it(E.bud.ok, 'debm-bud', '', 'Ajuster tes budgets', E.bud.n ? E.bud.n + ' conseil' + (E.bud.n > 1 ? 's' : '') + " d'après tes 6 derniers mois" : 'tes budgets sont bien réglés');
+  h += it(E.sol.ok, 'ctrl', '', 'Contrôle du solde', E.sol.ok ? 'fait pour ce mois ✓' : 'note ce qu\'il y a sur ton compte pour recaler l\'appli');
+  return h + '</div>';
+}
+// (9.11) Conseils de réglage : un budget mensuel dépassé au moins la moitié des 6 derniers mois terminés (3 au moins)
+// → l'augmenter vers ta dépense moyenne ; un budget toujours bien sous-utilisé → le baisser (pour compenser).
+function conseilsBudgets() {
+  const out = [], r5 = v => Math.ceil(v / 5) * 5;
+  cats().forEach(c => {
+    if (!VAR.includes(c.groupe) || c.type !== 'Dépense' || !(c.budget > 0) || c.suivi === 'Annuel' || c.suivi === 'Sans alerte' || estAv(c.nom)) return;
+    const M = []; let [y, m] = reculer(now.getFullYear(), now.getMonth() + 1);
+    for (let i = 0; i < 6; i++) { if (moisActif(y, m)) { const p = calc(y, m).par[c.nom], e = p ? p.e : 0; M.push({ dep: (p ? p.j : 0) + e, bud: c.budget + e, e }); } [y, m] = reculer(y, m); }
+    if (M.length < 3) return;
+    const Mp = M.filter(o => o.dep - o.e > 0.5), moy = Mp.length ? Mp.reduce((t, o) => t + o.dep - o.e, 0) / Mp.length : 0, // moyenne des mois où il y a eu des dépenses
+      nDep = M.filter(o => o.dep > o.bud + 0.5).length, max = Math.max(...M.map(o => o.dep - o.e));
+    if (nDep >= Math.max(3, Math.ceil(M.length / 2))) { const v = r5(moy); if (v > c.budget) out.push({ cat: c.nom, sens: 'haut', actuel: c.budget, v, moy, n: nDep, sur: M.length }); }
+    else if (M.every(o => o.dep <= o.bud * 0.7)) { const v = r5(Math.max(max * 1.2, (c.budget + moy) / 2)); if (v <= c.budget - 5) out.push({ cat: c.nom, sens: 'bas', actuel: c.budget, v, moy, n: 0, sur: M.length }); }
+  });
+  return out.sort((a, b) => (a.sens === 'haut' ? 0 : 1) - (b.sens === 'haut' ? 0 : 1));
+}
+function blocConseils() {
+  const L = conseilsBudgets(); if (!L.length) return '';
+  return `<div class="grp" style="margin-top:16px">💡 CONSEILS D'APRÈS TES 6 DERNIERS MOIS</div>` + L.map(o => `<div class="consl"><div><b>${esc(o.cat)}</b> · ${o.sens === 'haut' ? `dépassé ${o.n} mois sur ${o.sur} (en moyenne ${e0(o.moy)} pour ${e0(o.actuel)}). Ce budget est sans doute trop serré.` : `toujours bien en dessous (en moyenne ${e0(o.moy)} pour ${e0(o.actuel)}). Tu peux le baisser pour donner de la marge à un autre.`}</div>
+    <button class="chip" data-act="bud-conseil" data-cat="${esc(o.cat)}" data-v="${o.v}">${o.sens === 'haut' ? '▲' : '▼'} Passer à ${e0(o.v)}</button></div>`).join('')
+    + `<div class="note" style="display:block;margin-top:6px">Ce ne sont que des suggestions : augmenter un budget fait baisser ta fin de mois prévue, en baisser un autre la remonte. Touche une catégorie plus bas pour régler à la main.</div>`;
 }
 // Solde prévu jour par jour, d'aujourd'hui à la fin du mois prochain :
 // prélèvements à leur date, achats prévus, et budgets restants étalés sur les jours.
@@ -1845,6 +1880,7 @@ function sectionsModeEmploi() {
       ['⏱', 'LA JAUGE ET ' + INFOS.restant[0], INFOS.restant[1] + " Sous le chiffre, une phrase te dit si tu dépenses plus vite ou moins vite que prévu."],
       ['🗓', ...I('fin')], ['⏳', ...I('prelever')], ['🌱', ...I('nd')], ['📉', ...I('courbe')],
       ['🎯', ...I('budgets')],
+      ['🗓', 'NOUVEAU MOIS', "Du 1er au 7 du mois, une carte en haut de l'accueil regroupe les 3 choses à faire : voir ton bilan du mois passé, ajuster tes budgets (l'appli propose d'augmenter un budget souvent dépassé, ou d'en baisser un toujours sous-utilisé, d'après tes 6 derniers mois) et faire le contrôle du solde. Chaque point se coche quand il est fait ; le ✕ ferme la carte."],
       ['🖼', 'LA VITRINE', "De part et d'autre de la jauge : tes affiches à gauche, tes écussons à droite (3 de chaque). Touche-les pour les voir en grand ou changer ceux qui sont exposés."],
       ['🛍', 'ACHATS PLAISIR', "Tout en bas de l'accueil : tes achats plaisir du mois, traduits en heures de travail, et ta liste d'envies (une envie attend quelques jours avant d'être achetée)."]]],
     ['journal', '🧾', 'JOURNAL', 'Toutes tes lignes, mois par mois.', [
@@ -2160,7 +2196,7 @@ function rendreBudgets() {
       <div class="tl"><span>DISPO APRÈS CHARGES (${MC[nm - 1].toUpperCase()})</span><span>${e2(b.dispo)}</span></div>
       <div class="tl"><span>BUDGETS DU MOIS</span><span>${neg2(b.budVar)}</span></div>
       <hr class="dash"><div class="tl tot"><span>MARGE</span><span class="${marge < 0 ? 'c-bad' : 'c-ok'}">${marge >= 0 ? '+' : ''}${e2(marge)}</span></div></div>
-    <div class="note" style="margin-top:12px">Mensuel : le budget repart à zéro chaque mois. Annuel : ce que tu n'as pas dépensé se reporte sur les mois suivants. Sans alerte : suivi sans tampon.</div>`;
+    <div class="note" style="margin-top:12px">Mensuel : le budget repart à zéro chaque mois. Annuel : ce que tu n'as pas dépensé se reporte sur les mois suivants. Sans alerte : suivi sans tampon.</div>` + blocConseils();
   GROUPES.filter(g => VAR.includes(g)).forEach(g => {
     const z = l.filter(c => c.groupe === g); if (!z.length) return;
     h += `<div class="grp" style="margin-top:16px">${esc(g.toUpperCase())}</div>`;
@@ -5068,6 +5104,9 @@ document.addEventListener('click', ev => {
     case 'go-progres': fermer(); S.tab = 'stats'; S.statsVue = 'progres'; rendre(); scrollTo(0, 0); break;
     case 'allseries': S.allSeries = !S.allSeries; rendre(true); break;
     case 'story': { const sl = el.dataset.k === 'm' ? slidesMois(+el.dataset.y, +el.dataset.m) : slidesAnnee(+el.dataset.y); lancerStory(sl); break; }
+    case 'debm-x': LS.set('debMoisVu', nowYM()); rendre(true); break;
+    case 'debm-bud': LS.set('conseilsVu', nowYM()); S.form = { mode: 'budgets', edit: null }; rendreForm(); ouvrirSheet(); rendre(true); break;
+    case 'bud-conseil': { const c = cats().find(x => x.nom === el.dataset.cat), v = +el.dataset.v; if (!c || !(v > 0)) break; c.budget = v; appel('budget', { nom: c.nom, budget: v, suivi: c.suivi || 'Mensuel' }); memo = new Map(); toast(c.nom + ' : budget passé à ' + e0(v)); rendreBudgets(); rendre(true); break; }
     case 'bil-ban': LS.set('bilanVu', el.dataset.key); rendre(true); S.form = { mode: 'bilmois', y: +el.dataset.y, m: +el.dataset.m }; rendreForm(); ouvrirSheet(); break;
     case 'bilmois': S.form = { mode: 'bilmois', y: +el.dataset.y, m: +el.dataset.m }; rendreForm(); ouvrirSheet(); break;
     case 'sdiff': S.succesDiff = el.dataset.t; rendre(true); break;
