@@ -360,7 +360,7 @@ textarea.libin{height:auto;min-height:90px;font-family:var(--mono);font-size:12p
 .pcont{animation:fade .25s ease-out}
 /* collection plus compacte */
 .coll{grid-template-columns:repeat(4,1fr);gap:6px}.coll.c3{grid-template-columns:repeat(4,1fr)}
-.cit{padding:4px 3px 5px;border-radius:8px;min-width:0;overflow:hidden}.uiprev{overflow:hidden}.cit b{font-size:10.5px;line-height:1.2;margin-top:1px}.cit small{font-size:8px;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cit{padding:4px 3px 5px;border-radius:8px;min-width:0;overflow:hidden}.uiprev{overflow:hidden}.cit b{font-size:10.5px;line-height:1.2;margin-top:1px}.cit small{font-size:8px;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cit small.cvia{white-space:normal;letter-spacing:0;line-height:1.25;margin-top:2px;opacity:.85;text-transform:none}
 .cit.verr small{white-space:normal;line-height:1.25} /* lot H : la condition de déblocage se lit en entier */
 .tprev,.pprev,.kprev,.fprev{height:40px}.fprev{font-size:24px}.pprev .big{font-size:18px}
 .cit .nbadge{font-size:7.5px;top:-6px}
@@ -767,7 +767,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.7';
+const VERSION = '9.8';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -4239,6 +4239,8 @@ function compteDf(k, f) {
   return f[k] || 0;
 }
 const libDf = df => df[1] + ' ' + DF_COSM[df[0]][df[1] > 1 ? 1 : 0];
+// (9.8) Sous un cosmétique déjà débloqué : comment il a été gagné
+const viaCosm = o => (!o.saison && !o.suc && !o.df && !o.prest && o.niv <= 1) ? 'de base' : o.saison ? '🎟️ ' + commentDebloquer(o) : o.suc ? '🏆 ' + commentDebloquer(o) : o.df ? '🎯 ' + commentDebloquer(o) : o.prest ? '★ ' + commentDebloquer(o) : '✓ ' + commentDebloquer(o);
 const commentDebloquer = o => o.saison ? 'saison « ' + nomSaison(o.saison) + ' »' + (o.ed ? ' ×' + o.ed + ' (or)' : '') : o.suc ? 'succès « ' + nomSucces(o.suc) + ' »' : o.df ? libDf(o.df) : o.prest ? 'étoile de prestige ' + o.prest : 'niveau ' + o.niv;
 // Récompense de chaque rang : une couleur d'accent à ses couleurs
 const ECL = (h, k) => '#' + h.slice(1).match(/../g).map(x => Math.max(0, Math.min(255, Math.round(parseInt(x, 16) * k)))).map(v => v.toString(16).padStart(2, '0')).join('');
@@ -4379,7 +4381,7 @@ function blocCollection(e) {
   if (T === 'ui' || T === 'texte' || T === 'theme' || T === 'ambiance') h += `<div class="note" style="display:block;margin:0 0 8px">Touche un style verrouillé pour l'essayer 4 secondes.</div>`;
   h += `<div class="coll ${T === 'skin' ? 'c3' : ''}">`;
   L.filter(o => o.t === T).forEach(o => { const u = debloque(o, e.niv), nv = nouveaux.includes(o), proche = !u && parNiveau(o) && o.niv === e.niv + 1;
-    h += `<button class="cit ${sel === o.id ? 'on' : ''} ${u ? '' : 'verr'} ${proche ? 'proche' : ''}" data-act="${u ? 'cosm' : 'lock'}" data-t="${o.t}" data-id="${o.id}" data-niv="${o.niv}" data-suc="${o.suc || ''}" data-sais="${o.saison || ''}" data-ed="${o.ed || ''}" data-prest="${o.prest || ''}" data-df="${o.df ? esc(libDf(o.df)) : ''}">${nv ? '<em class="nbadge">NOUVEAU</em>' : ''}<span class="cprev">${apercuCosm(o)}</span><b>${esc(o.nom)}</b><small>${u ? (sel === o.id ? 'ACTIF' : 'CHOISIR') : o.saison ? '🎟️ ' + esc(nomSaison(o.saison)) + (o.ed ? ' · OR' : '') : o.suc ? '🏆 SUCCÈS « ' + esc(nomSucces(o.suc)) + ' »' : o.df ? '🎯 ' + esc(libDf(o.df)) + (compteDf(o.df[0], e.f) ? ' (' + Math.min(compteDf(o.df[0], e.f), o.df[1]) + '/' + o.df[1] + ')' : '') : o.prest ? '★ ' + o.prest + ' ÉTOILE' + (o.prest > 1 ? 'S' : '') : '🔒 NIVEAU ' + o.niv}</small></button>`; });
+    h += `<button class="cit ${sel === o.id ? 'on' : ''} ${u ? '' : 'verr'} ${proche ? 'proche' : ''}" data-act="${u ? 'cosm' : 'lock'}" data-t="${o.t}" data-id="${o.id}" data-niv="${o.niv}" data-suc="${o.suc || ''}" data-sais="${o.saison || ''}" data-ed="${o.ed || ''}" data-prest="${o.prest || ''}" data-df="${o.df ? esc(libDf(o.df)) : ''}">${nv ? '<em class="nbadge">NOUVEAU</em>' : ''}<span class="cprev">${apercuCosm(o)}</span><b>${esc(o.nom)}</b><small>${u ? (sel === o.id ? 'ACTIF' : 'CHOISIR') : o.saison ? '🎟️ ' + esc(nomSaison(o.saison)) + (o.ed ? ' · OR' : '') : o.suc ? '🏆 SUCCÈS « ' + esc(nomSucces(o.suc)) + ' »' : o.df ? '🎯 ' + esc(libDf(o.df)) + (compteDf(o.df[0], e.f) ? ' (' + Math.min(compteDf(o.df[0], e.f), o.df[1]) + '/' + o.df[1] + ')' : '') : o.prest ? '★ ' + o.prest + ' ÉTOILE' + (o.prest > 1 ? 'S' : '') : '🔒 NIVEAU ' + o.niv}</small>${u ? `<small class="cvia">${esc(viaCosm(o))}</small>` : ''}</button>`; });
   return h + '</div><div class="note" style="display:block;margin-top:8px">Comment se débloquent les éléments verrouillés : 🔒 niveau · 🏆 succès · 🎯 défis de la semaine, défis du mois, missions, événements · 🎟️ saisons · ★ prestige.</div>';
 }
 const AMB_PREV = { halloween: ['radial-gradient(circle at 75% 25%,rgba(255,138,43,.6),transparent 40%),#140A1C', '#FF8A2B'], paques: ['linear-gradient(160deg,#FFE9F6,#E6F0FF,#E9FFF4)', '#9B6BFF'], ete: ['linear-gradient(180deg,#FFB38A,#FFE3A0)', '#E8603C'], noel: ['radial-gradient(1.5px 1.5px at 30% 30%,#fff,transparent),radial-gradient(1.5px 1.5px at 70% 60%,#fff,transparent),linear-gradient(180deg,#071430,#1E3A6A)', '#FFD36B'], aucune: ['var(--card)', 'var(--ink3)'], coucher: ['linear-gradient(180deg,#FFE7C9,#EBC0DA)', '#D9542F'], ocean: ['linear-gradient(180deg,#0A4466,#041826)', '#7FE6FF'],
@@ -4697,7 +4699,7 @@ function toast(txt, btn, fn) {
 //     r: { taux: €/h net SAISI À LA MAIN (absent = calculé, voir tauxHoraire), hs: heures par semaine (absent = HEURES_SEMAINE_DEFAUT),
 //          seuil: petit achat en €, delai: 2 | 7 | 14 jours, env: enveloppe plaisir hebdo en € (absente = calculée) } }
 // (9.6) L'option « achat en ligne » a été retirée de la saisie : e.enLigne n'est plus que lu depuis le fichier (anciennes lignes).
-const ACH_SEUIL = 30, ENV_DELAIS = [2, 7, 14], ENV_MAX = 7000, ENV_GRPS = ['Loisirs', 'Divers'];
+const ACH_SEUIL = 20, ENV_DELAIS = [2, 7, 14], ENV_MAX = 7000, ENV_GRPS = ['Loisirs', 'Divers'];
 const r2 = v => Math.round(v * 100) / 100;
 function prefEnvies() {
   const p = getPref('envies', null), o = p && typeof p === 'object' && !Array.isArray(p) ? JSON.parse(JSON.stringify(p)) : {};
