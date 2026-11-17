@@ -768,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.14';
+const VERSION = '9.15';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1970,7 +1970,7 @@ function sectionsModeEmploi() {
       ['🧺', 'CATÉGORIES QUI NE CASSENT PAS LES SÉRIES', "Réglages › Mon budget (ou Stats › Progrès › Défis, tout en bas) : coche par exemple Courses si faire les courses ne doit pas casser un jour sans dépense. Les montants comptent toujours dans tes budgets."],
       ['📅', 'CHAQUE MOIS', "En haut des Réglages : le contrôle du solde (✓ quand il est fait pour le mois), le retrait d'espèces et les budgets par catégorie."],
       ['⏱', 'TAUX HORAIRE', "Dans Achats plaisir : calculé tout seul (salaire moyen des 3 derniers mois ÷ tes heures de contrat). Tu peux changer les heures par semaine ou saisir un taux à la main."],
-      ['◀', 'BOUTON RETOUR', "Le retour du téléphone ferme la fenêtre ouverte, puis revient à l'accueil. Sur l'accueil, appuie deux fois pour quitter."],
+      ['◀', 'BOUTON RETOUR', "Le retour du téléphone ferme la fenêtre ouverte, puis revient à l'accueil. Il ne fait jamais sortir de l'appli : pour la quitter, utilise le bouton ou le geste « accueil » du téléphone."],
       ['🙈', 'MODE DISCRET', "Floute les montants quand tu montres ton téléphone."]]]];
 }
 function rendreModeEmploi() {
@@ -5082,25 +5082,31 @@ function clicAchats(a, el) {
 // reste sur place (petit message), un 2e retour quitte l'appli normalement. Une seule garde à la fois : fermer une feuille
 // au ✕ ne désynchronise rien. La garde n'est posée qu'après un premier geste (sinon Chrome la saute) et jamais dans Apps Script.
 // iOS : pas de bouton retour ; le balayage depuis le bord fait la même chose que « retour ».
-let gardeRetour = false;
+// (9.15) Sur certains téléphones, sortir de la page par « retour » laissait un ÉCRAN BLANC (il fallait fermer l'appli
+// depuis les tâches en cours). Désormais « retour » ne fait JAMAIS sortir de l'appli : sur l'accueil sans rien d'ouvert,
+// un petit message rappelle d'utiliser le bouton ou le geste « accueil » du téléphone. La garde est reconnue par l'état
+// de l'historique (et plus par un drapeau), ce qui reste juste après une mise en veille, un rechargement ou deux retours rapides.
+const estGarde = () => { try { return !!(history.state && history.state.jauge === 'garde'); } catch (e) { return false; } };
 function armerRetour() {
-  if (gardeRetour || IN_GAS) return;
-  try { if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; history.pushState({ jauge: 'garde' }, ''); gardeRetour = true; } catch (e) {}
+  if (IN_GAS || estGarde()) return;
+  try { if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; history.pushState({ jauge: 'garde' }, ''); } catch (e) {}
 }
 if (!IN_GAS) {
   try { history.scrollRestoration = 'manual'; } catch (e) {}
   addEventListener('popstate', () => {
-    if (!gardeRetour) return; // pas notre garde (ex. ancre) : on laisse faire
-    gardeRetour = false;
+    if (estGarde()) return; // on revient « en avant » sur la garde : rien à faire
     const st = document.querySelector('.story'), pl = $('#plein');
     if (st) { if (st._fermer) st._fermer(); else st.remove(); }
     else if (pl && pl.classList.contains('on')) fermerPlein();
     else if ($('#sheet').classList.contains('on')) fermer();
     else if (S.tab !== 'home') { S.tab = 'home'; S.filtre.cat = null; S.filtre.grp = null; rendre(); scrollTo(0, 0); }
-    else { toast('Appuie encore sur retour pour quitter'); return; } // pas de nouvelle garde : le prochain « retour » quitte
-    armerRetour();
+    else toast("Tu es sur l'accueil. Pour quitter, utilise le bouton ou le geste « accueil » du téléphone");
+    armerRetour(); // la garde est reposée tout de suite : le prochain « retour » reste aussi dans l'appli
   });
-  document.addEventListener('click', armerRetour, true); // chaque geste repose la garde si elle a servi
+  ['click', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, armerRetour, true)); // chaque geste repose la garde si besoin
+  // Retour sur l'appli après une mise en veille : on redessine (évite une page restée vide)
+  addEventListener('pageshow', e => { if (e.persisted) { try { rendre(true); } catch (x) {} } });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !document.querySelector('#view *')) { try { rendre(true); } catch (x) {} } });
 }
 
 /* ================= ÉVÉNEMENTS ================= */
