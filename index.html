@@ -768,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.15';
+const VERSION = '9.16';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1108,7 +1108,7 @@ function calc(y, m) {
     const c = cm[n], t = par[n].j + par[n].e;
     if (estAv(n)) av += t;
     else if (c.type === 'Revenu') rev += t;
-    else if (c.type === 'Épargne') { ep += t; epV += t; }
+    else if (c.type === 'Épargne') { ep += t; if (!/pr[êe]t/i.test(n)) epV += t; } // (9.16) un prêt sort du compte mais n'est pas de l'épargne
     else if (c.type === 'Retrait') { ep -= t; epR += t; }
     else if (FIX.includes(c.groupe)) fix += t;
     else if (VAR.includes(c.groupe)) { vr += t; jvar += par[n].j; budVar += par[n].e; }
@@ -1565,8 +1565,9 @@ function etatDebutMois() {
   const ca = conseilsAnnuels().length, janv = now.getMonth() === 0, nc = conseilsBudgets().length + (janv ? 0 : ca), bud = { n: nc, ok: !nc || LS.get('conseilsVu', 0) === nowYM() };
   const an = janv ? { n: ca, ok: !ca || LS.get('conseilsVu', 0) === nowYM(), y: now.getFullYear() - 1 } : null;
   const sol = { ok: LS.get('ctrlFait', 0) === nowYM() };
-  if ((!bil || bil.ok) && bud.ok && sol.ok && (!an || an.ok)) return null;
-  return { bil, bud, sol, an };
+  const obj = now.getMonth() === 0 ? { ok: +objectifs()[now.getFullYear()] > 0, y: now.getFullYear() } : null; // (9.16) janvier : fixer l'objectif d'épargne de l'année
+  if ((!bil || bil.ok) && bud.ok && sol.ok && (!an || an.ok) && (!obj || obj.ok)) return null;
+  return { bil, bud, sol, an, obj };
 }
 function carteBilanMois() {
   const E = etatDebutMois(); if (!E) return '';
@@ -1575,6 +1576,7 @@ function carteBilanMois() {
   if (E.bil) h += it(E.bil.ok, 'bil-ban', `data-key="${E.bil.cle}" data-y="${E.bil.y}" data-m="${E.bil.m}"`, 'Ton bilan de ' + esc(MOIS[E.bil.m - 1].toLowerCase()), (E.bil.restant >= 0 ? 'fini à +' : 'fini à ') + e0(E.bil.restant) + ' · le récap en images');
   h += it(E.bud.ok, 'debm-bud', '', 'Ajuster tes budgets', E.bud.n ? E.bud.n + ' conseil' + (E.bud.n > 1 ? 's' : '') + " d'après tes 6 derniers mois" : 'tes budgets sont bien réglés');
   if (E.an) h += it(E.an.ok, 'debm-bud', '', 'Ajuster tes budgets annuels', E.an.n ? 'bilan ' + E.an.y + ' : ' + E.an.n + ' conseil' + (E.an.n > 1 ? 's' : '') : 'tes budgets annuels sont bien réglés');
+  if (E.obj) h += it(E.obj.ok, 'obj-edit', '', "Fixer ton objectif d'épargne " + E.obj.y, E.obj.ok ? 'objectif fixé ✓' : "combien veux-tu mettre de côté cette année ? (suggestion d'après ton rythme)");
   h += it(E.sol.ok, 'ctrl', '', 'Contrôle du solde', E.sol.ok ? 'fait pour ce mois ✓' : 'note ce qu\'il y a sur ton compte pour recaler l\'appli');
   return h + '</div>';
 }
@@ -1934,7 +1936,7 @@ function sectionsModeEmploi() {
       ['⏱', 'LA JAUGE ET ' + INFOS.restant[0], INFOS.restant[1] + " Sous le chiffre, une phrase te dit si tu dépenses plus vite ou moins vite que prévu."],
       ['🗓', ...I('fin')], ['⏳', ...I('prelever')], ['🌱', ...I('nd')], ['📉', ...I('courbe')],
       ['🎯', ...I('budgets')],
-      ['🗓', 'NOUVEAU MOIS', "Du 1er au 7 du mois, une carte en haut de l'accueil regroupe les 3 choses à faire : voir ton bilan du mois passé, ajuster tes budgets (l'appli propose d'augmenter un budget souvent dépassé, ou d'en baisser un toujours sous-utilisé, d'après tes 6 derniers mois ; en janvier, le bilan de l'année pour tes budgets annuels, et toute l'année une alerte si un budget annuel est déjà dépassé) et faire le contrôle du solde. Chaque point se coche quand il est fait ; le ✕ ferme la carte."],
+      ['🗓', 'NOUVEAU MOIS', "Du 1er au 7 du mois, une carte en haut de l'accueil regroupe les 3 choses à faire : voir ton bilan du mois passé, ajuster tes budgets (l'appli propose d'augmenter un budget souvent dépassé, ou d'en baisser un toujours sous-utilisé, d'après tes 6 derniers mois ; en janvier, le bilan de l'année pour tes budgets annuels, et toute l'année une alerte si un budget annuel est déjà dépassé), en janvier fixer ton objectif d'épargne de l'année et faire le contrôle du solde. Chaque point se coche quand il est fait ; le ✕ ferme la carte."],
       ['🖼', 'LA VITRINE', "De part et d'autre de la jauge : tes affiches à gauche, tes écussons à droite (3 de chaque). Touche-les pour les voir en grand ou changer ceux qui sont exposés."],
       ['🛍', 'ACHATS PLAISIR', "Tout en bas de l'accueil : tes achats plaisir du mois, traduits en heures de travail, et ta liste d'envies (une envie attend quelques jours avant d'être achetée)."]]],
     ['journal', '🧾', 'JOURNAL', 'Toutes tes lignes, mois par mois.', [
@@ -1988,7 +1990,7 @@ function montantNum() { const n = parseFloat(String(S.form.montant).replace(',',
 function rendreForm() {
   const f = S.form; if (!f) return;
   const RA = vuesAchats()[f.mode]; if (RA) return RA(); // feuilles « Achats plaisir » (liste d'envies, petits achats, réglages)
-  const R = { file: rendreFile, info: rendreInfo, videotheque: rendreVideotheque, vitrine: rendreVitrine, xplog: rendreXpLog, xpinfo: rendreXpInfo, jd: rendreJD, tuto: rendreTuto, aide: rendreModeEmploi, exclus: rendreExclus, soon: rendreSoon, objedit: rendreObjEdit, resume: rendreResume, bilmois: rendreBilMois, wrapped: rendreWrapped, remb: rendreRemb, defi: rendreDefi, lien: rendreLien, reglages: rendreReglages, budgets: rendreBudgets, cats: rendreCats, catedit: rendreCatEdit, solde: rendreSolde, ech: rendreEch, av: rendreAv, mois: rendreMoisGrille, fiche: rendreFiche }[f.mode];
+  const R = { file: rendreFile, info: rendreInfo, videotheque: rendreVideotheque, vitrine: rendreVitrine, xplog: rendreXpLog, xpinfo: rendreXpInfo, jd: rendreJD, tuto: rendreTuto, aide: rendreModeEmploi, exclus: rendreExclus, soon: rendreSoon, objedit: rendreObjEdit, objdetail: rendreObjDetail, resume: rendreResume, bilmois: rendreBilMois, wrapped: rendreWrapped, remb: rendreRemb, defi: rendreDefi, lien: rendreLien, reglages: rendreReglages, budgets: rendreBudgets, cats: rendreCats, catedit: rendreCatEdit, solde: rendreSolde, ech: rendreEch, av: rendreAv, mois: rendreMoisGrille, fiche: rendreFiche }[f.mode];
   if (R) return R();
   const fav = favoris(f.type), pins = LS.get('pins', []), moisFutur = statut(f.y, f.m) === 'futur', futur = estPrevu(f);
   if (f.cat && !fav.includes(f.cat) && typeDe(f.cat) === f.type) fav.unshift(f.cat);
@@ -3015,7 +3017,7 @@ function faitsJeu96(M, J, v) {
 }
 // Épargne du mois en cours déjà passée : lignes datées jusqu'à aujourd'hui + prélèvements de l'échéancier dont le jour est arrivé
 function epargneCourante() {
-  const y = now.getFullYear(), m = now.getMonth() + 1, A = auj(), cm = catMap(), ep = n => { const c = cm[n]; return !!c && c.type === 'Épargne' && !estAv(n); };
+  const y = now.getFullYear(), m = now.getMonth() + 1, A = auj(), cm = catMap(), ep = n => { const c = cm[n]; return !!c && c.type === 'Épargne' && !estAv(n) && !/pr[êe]t/i.test(n); };
   let t = S.journal.filter(e => !e.deleted && e.y === y && e.m === m && e.montant && ep(e.cat) && (!e.date || e.date <= A)).reduce((s, e) => s + e.montant, 0);
   ((S.data && S.data.echeancier) || []).forEach(e => { if (ep(e.cat) && (e.jour || 1) <= now.getDate()) t += echMontant(e, y, m); });
   return t;
@@ -4156,10 +4158,32 @@ function blocProchainement(keys) {
 const objectifs = () => getPref('objectifs', {}) || {};
 // Épargne de l'année = tous les versements (catégories Épargne, Journal + Prévu) de janvier à ce mois-ci.
 // Les retraits ne sont pas déduits : un retrait de livret se saisit comme un revenu.
+// (9.16) Les prêts à des proches ne sont PAS de l'épargne pour l'objectif (avant, ils gonflaient la jauge),
+// et un virement automatique du mois en cours ne compte qu'une fois sa date passée.
+const estPret = n => /pr[êe]t/i.test(n || '');
+function versementsEpargne(y) {
+  const cm = catMap(), Y = now.getFullYear(), fin = y < Y ? 12 : y > Y ? 0 : now.getMonth() + 1, A = auj(), L = [];
+  const ok = n => { const c = cm[n]; return !!c && c.type === 'Épargne' && !estAv(n); };
+  for (let m = 1; m <= fin; m++) {
+    const cours = y === Y && m === fin;
+    S.journal.forEach(e => { if (!e.deleted && e.y === y && e.m === m && e.montant && ok(e.cat) && !(cours && e.date && e.date > A)) L.push({ m, lib: e.lib || e.cat, cat: e.cat, v: e.montant, src: 'Journal', pret: estPret(e.cat) }); });
+    ((S.data && S.data.echeancier) || []).forEach(e => { if (!ok(e.cat)) return; const v = echMontant(e, y, m); if (v && !(cours && (e.jour || 1) > now.getDate())) L.push({ m, lib: e.lib || e.cat, cat: e.cat, v, src: 'Échéancier', pret: estPret(e.cat) }); });
+  }
+  return L;
+}
 function epAnnee(y, retraits) {
-  const fin = y < now.getFullYear() ? 12 : y > now.getFullYear() ? 0 : now.getMonth() + 1; let t = 0;
-  for (let m = 1; m <= fin; m++) t += retraits ? calc(y, m).epR : calc(y, m).epV;
-  return t;
+  if (retraits) { const Y = now.getFullYear(), fin = y < Y ? 12 : y > Y ? 0 : now.getMonth() + 1; let t = 0; for (let m = 1; m <= fin; m++) t += calc(y, m).epR; return t; }
+  return versementsEpargne(y).filter(x => !x.pret).reduce((t, x) => t + x.v, 0);
+}
+function rendreObjDetail() {
+  const y = S.form.y, L = versementsEpargne(y), C = L.filter(x => !x.pret), P = L.filter(x => x.pret);
+  let h = enteteSheet("ÉPARGNE " + y + " · DÉTAIL", null) + `<div class="note" style="display:block;margin-top:10px">Chaque versement compté dans ta jauge, mois par mois. « Échéancier » = virement automatique (compté à sa date). Si une ligne est fausse ou en double, corrige-la dans le Journal ou dans Prévu.</div>`;
+  if (!C.length) h += `<div class="empty">Aucun versement d'épargne compté en ${y}.</div>`;
+  for (let m = 1; m <= 12; m++) { const Z = C.filter(x => x.m === m); if (!Z.length) continue;
+    h += `<div class="sec"><span>${MOIS[m - 1].toUpperCase()}</span><span>${e0(Z.reduce((t, x) => t + x.v, 0))}</span></div>` + Z.map(x => `<div class="tl"><span>${esc(x.lib)}<small class="muted" style="display:block;font-size:11px">${esc(x.cat)} · ${x.src}</small></span><span>${e2(x.v)}</span></div>`).join(''); }
+  h += `<hr class="dash"><div class="tl tot"><span>TOTAL COMPTÉ</span><span>${e2(C.reduce((t, x) => t + x.v, 0))}</span></div>`;
+  if (P.length) h += `<div class="note" style="display:block;margin-top:12px">Non comptés : tes prêts à des proches (${e0(P.reduce((t, x) => t + x.v, 0))} en ${y}). Prêter n'est pas épargner : cet argent revient quand on te rembourse.</div>`;
+  $('#sheetIn').innerHTML = h;
 }
 function etatObjectif(y) {
   const cible = +objectifs()[y] || 0; if (!(cible > 0)) return null;
@@ -4179,9 +4203,9 @@ function blocObjectif() {
   const y = now.getFullYear(), o = etatObjectif(y);
   let h = `<div class="sec"><span>OBJECTIF D'ÉPARGNE ${y}</span>${o ? '<button class="lnk" data-act="obj-edit">RÉGLER</button>' : ''}</div>`;
   if (!o) return h + `<div class="note" style="display:block;margin-top:0">Combien veux-tu mettre de côté en ${y} ? Une jauge dédiée te dira si tu es dans les temps.</div><button class="go" data-act="obj-edit" style="margin-top:8px">FIXER MON OBJECTIF</button>`;
-  return h + `<div class="obj ${o.atteint ? 'win' : ''}">${jaugeObjectif(o.frac)}
+  return h + `<div class="obj ${o.atteint ? 'win' : ''}"><button data-act="obj-detail" style="display:block;width:100%" aria-label="Voir le détail des versements">${jaugeObjectif(o.frac)}</button>
     <div class="objn"><b>${e0(o.ep)}</b><span>sur ${e0(o.cible)}</span></div>
-    <div class="note" style="display:block;text-align:center;margin:0 0 4px">Versements de janvier à fin ${MC[now.getMonth()]} (livrets, PEA, assurance vie…)${epAnnee(y, true) > 0.5 ? ` · anciens retraits non déduits : ${e0(epAnnee(y, true))}` : ''}</div>
+    <div class="note" style="display:block;text-align:center;margin:0 0 4px">Versements de janvier à aujourd'hui (livrets, PEA, assurance vie… hors prêts à des proches) · <button class="lnk" data-act="obj-detail">VOIR LE DÉTAIL ›</button>${epAnnee(y, true) > 0.5 ? ` · anciens retraits non déduits : ${e0(epAnnee(y, true))}` : ''}</div>
     <div class="note" style="display:block;text-align:center;margin-top:4px">${o.atteint ? '🎉 Objectif atteint, bravo !' : `${o.ecart >= 0 ? `<b class="c-ok">En avance de ${e0(o.ecart)}</b>` : `<b class="c-bad">En retard de ${e0(-o.ecart)}</b>`} sur le rythme prévu · encore <b>${e0(o.parMois)}/mois</b> d'ici décembre`}${o.proj != null && !o.atteint ? `<br>À ce rythme, tu finis l'année à <b>${e0(o.proj)}</b>` : ''}</div></div>`;
 }
 function rendreObjEdit() {
@@ -4189,7 +4213,7 @@ function rendreObjEdit() {
   let t = 0, n = 0; for (let k = 1; k <= 6; k++) { let yy = now.getFullYear(), mm = now.getMonth() + 1 - k; while (mm < 1) { mm += 12; yy--; } if (moisActif(yy, mm)) { t += calc(yy, mm).ep; n++; } }
   const sug = n ? Math.max(100, Math.round(t / n * 12 / 100) * 100) : 0;
   $('#sheetIn').innerHTML = enteteSheet("OBJECTIF D'ÉPARGNE " + f.y, null) + `
-    <div class="note" style="display:block;margin-top:10px">Tout ce qui part sur l'épargne dans l'année compte (Échéancier compris). Les retraits ne sont pas déduits.</div>
+    <div class="note" style="display:block;margin-top:10px">Tout ce qui part sur l'épargne dans l'année compte (Échéancier compris, à sa date), sauf les prêts à des proches. Les retraits ne sont pas déduits.</div>
     <input class="libin" data-f="montant" inputmode="decimal" placeholder="Montant pour l'année en €" value="${esc(f.montant)}" style="margin-top:12px">
     ${sug ? `<button class="chip sug" data-act="obj-sug" data-v="${sug}">Suggestion : ${e0(sug)} (ton rythme des 6 derniers mois)</button>` : ''}
     <div class="err" id="ferr"></div><button class="go" data-act="obj-ok">ENREGISTRER</button>
@@ -5143,6 +5167,7 @@ document.addEventListener('click', ev => {
     case 'save': enregistrer(); break;
     case 'soon': S.form = { mode: 'soon', k: el.dataset.k }; rendreForm(); ouvrirSheet(); break;
     case 'obj-edit': { const y = now.getFullYear(), o = objectifs()[y]; S.form = { mode: 'objedit', y, montant: o ? String(o) : '', existe: !!o }; rendreForm(); ouvrirSheet(); break; }
+    case 'obj-detail': S.form = { mode: 'objdetail', y: now.getFullYear() }; rendreForm(); ouvrirSheet(); break;
     case 'obj-sug': S.form.montant = el.dataset.v; rendreObjEdit(); break;
     case 'obj-ok': { const n = parseFloat(String(S.form.montant || '').replace(/\s/g, '').replace(',', '.')); if (!(n > 0)) { $('#ferr').textContent = 'Tape un montant'; break; } const O = Object.assign({}, objectifs()); const oy = S.form.y; O[oy] = Math.round(n); setPref('objectifs', O); fermer(); rendre(true); toast('Objectif ' + oy + ' : ' + e0(n)); break; }
     case 'obj-del': { const O = Object.assign({}, objectifs()); delete O[S.form.y]; setPref('objectifs', O); fermer(); rendre(true); toast('Objectif retiré'); break; }
