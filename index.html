@@ -768,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.24';
+const VERSION = '9.25';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1935,12 +1935,29 @@ function favoris(t, sens) {
   const sc = n => (pins.includes(n) ? 1e6 : 0) + (use[n] || 0) * 3 + (cnt[n] || 0);
   return l.slice().sort((a, b) => sc(b) - sc(a)).slice(0, Math.max(6, l.filter(n => pins.includes(n)).length));
 }
-function suggestions(cat) {
-  const vus = new Set(), out = [];
-  S.journal.slice().sort((a, b) => ((b.y || 0) * 12 + (b.m || 0)) - ((a.y || 0) * 12 + (a.m || 0)) || (b.row || 1e9) - (a.row || 1e9))
-    .forEach(e => { if (e.cat !== cat || !e.lib || e.lib === cat || /^Écart/.test(e.lib) || vus.has(e.lib)) return; vus.add(e.lib); out.push(e.lib); });
-  return out.slice(0, 3);
+// (9.25) Suggestions de libellés : classées par FRÉQUENCE (bonus aux plus récents), filtrées pendant la frappe.
+// Sans catégorie choisie, la recherche porte sur toutes les catégories du type et propose aussi la catégorie habituelle.
+const sansAcc = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function suggestions(cat, q, type) {
+  const qn = sansAcc(q).trim(), lim = Date.now() - 864e5 * 60, M = new Map();
+  S.journal.forEach(e => {
+    if (e.deleted || !e.lib || e.lib === e.cat || /^Écart/.test(e.lib) || /·/.test(e.lib)) return;
+    if (cat ? e.cat !== cat : (!type || typeDe(e.cat) !== type)) return;
+    const k = e.lib + '\u0001' + (cat ? '' : e.cat), o = M.get(k) || { lib: e.lib, cat: e.cat, n: 0, t: 0 };
+    const t = e.y ? new Date(e.y, e.m - 1, e.date ? +e.date.slice(8, 10) : 15).getTime() : 0;
+    o.n += 1 + (t >= lim ? 1 : 0); o.t = Math.max(o.t, t); M.set(k, o);
+  });
+  let L = [...M.values()];
+  if (qn) L = L.filter(o => { const l = sansAcc(o.lib); return l !== qn && l.includes(qn); }).sort((a, b) => (sansAcc(b.lib).startsWith(qn) - sansAcc(a.lib).startsWith(qn)) || b.n - a.n || b.t - a.t);
+  else L.sort((a, b) => b.n - a.n || b.t - a.t);
+  const vus = new Set(); return L.filter(o => !vus.has(o.lib + (cat ? '' : o.cat)) && vus.add(o.lib + (cat ? '' : o.cat))).slice(0, 4);
 }
+function htmlSugLib() {
+  const f = S.form; if (!f) return '';
+  const q = f.lib || '', L = f.cat ? suggestions(f.cat, q) : (q.trim().length >= 2 ? suggestions(null, q, f.type) : []);
+  return L.map(o => `<button class="chip sug" data-act="libsug" data-l="${esc(o.lib)}"${f.cat ? '' : ` data-c="${esc(o.cat)}"`}>${esc(o.lib)}${f.cat ? '' : ` <span class="muted">· ${esc(o.cat)}</span>`}</button>`).join('');
+}
+function majSugLib() { const z = $('#libsug'); if (z) { const h = htmlSugLib(); z.innerHTML = h; z.style.display = h ? '' : 'none'; } }
 function ouvrirSaisie(e, dup) {
   const t = e ? typeDe(e.cat) : 'Dépense';
   const ym = statut(S.y, S.m) === 'futur' ? { y: now.getFullYear(), m: now.getMonth() + 1 } : { y: S.y, m: S.m };
@@ -2042,7 +2059,7 @@ function rendreForm() {
     const g = {}; catsDuType(f.type, f.sens).forEach(c => (g[c.groupe] = g[c.groupe] || []).push(c.nom));
     Object.keys(g).forEach(k => tout += `<div class="grp">${esc(k.toUpperCase())}</div><div class="chips">` + g[k].map(n => `<button class="chip ${f.cat === n ? 'on' : ''}" data-act="cat" data-cat="${esc(n)}">${esc(n)}</button>`).join('') + '</div>');
   }
-  const sug = f.cat ? suggestions(f.cat) : [];
+  const sugH = htmlSugLib();
   $('#sheetIn').innerHTML = `<div class="fsai"><div class="grab"></div>
     <div class="shead"><span>${f.mode === 'edit' ? 'MODIFIER LA LIGNE' : futur ? (f.type === 'Revenu' ? 'REVENU PRÉVU' : f.type === 'Épargne' ? 'ÉPARGNE PRÉVUE' : 'ACHAT PRÉVU') : 'NOUVELLE LIGNE'} ${LS.get('aidesOff', false) ? '' : `<button class="lnk" data-act="tuto" style="margin-left:6px">? AIDE</button>`}</span><button class="ibtn" data-act="close" aria-label="Fermer">${ico.x}</button></div>
     <div class="seg">${Object.keys(TYPES).map(t => `<button class="${f.type === t ? 'on' : ''}" data-act="type" data-t="${t}">${t.toUpperCase()}</button>`).join('')}</div>
@@ -2065,13 +2082,13 @@ function rendreForm() {
     ${f.type === 'Épargne' ? `${!LS.get('aidesOff', false) ? `<div class="note" style="display:block;margin:-2px 0 8px">${f.sens === 'retrait' ? `Argent que tu <b>sors</b> d'un livret (livret A, LDDS, LEP…), d'un PEA ou d'une assurance vie. Il compte comme une <b>rentrée d'argent</b> ce mois-ci et fait <b>baisser ton épargne nette</b>. Si tu le remets plus tard, saisis-le dans « ↓ Mettre de côté » : les deux s'annulent. Précise le compte dans le libellé (ex. « LDDS »).` : `Argent que tu <b>mets de côté</b> (livrets, PEA, assurance vie, crypto…). Pour de l'argent que tu en sors, choisis « ↑ Retirer ». Pour <b>prêter</b> de l'argent à quelqu'un : DÉPENSE › « 👥 Payé pour d'autres / prêt », ma part 0 €.`}</div>` : ''}
       ${f.sens === 'retrait' && !catsDuType('Épargne', 'retrait').length ? `<div class="note" style="display:block;margin:-2px 0 8px;color:var(--bad)">Aucune catégorie de retrait dans ton fichier : ajoute une catégorie « Retrait d'épargne » (groupe Épargne) dans ⚙ Réglages › Catégories.</div>` : ''}` : ''}
     <input class="libin" id="lib" placeholder="Libellé (facultatif)" value="${esc(f.lib)}" autocomplete="off" maxlength="80">
-    ${sug.length ? `<div class="chips" style="margin:-4px 0 8px">${sug.map(s => `<button class="chip sug" data-act="libsug" data-l="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : ''}
+    <div class="chips" id="libsug" style="margin:-4px 0 8px;${sugH ? '' : 'display:none'}">${sugH}</div>
     <div class="pad">${['1','2','3','4','5','6','7','8','9',',','0','⌫'].map(k => `<button data-k="${k}">${k === '⌫' ? ico.back : k}</button>`).join('')}</div>
     ${f.type === 'Dépense' && f.mode === 'add' && !futur ? `<div class="mrow envlnk" style="margin:2px 0 8px"><button class="lnk" data-act="env-depuis">💭 PAS SÛR ? METS-LE EN LISTE D'ENVIES</button></div>` : ''}
     <div class="err" id="ferr"></div>
     <button class="go" data-act="save">${f.mode === 'edit' ? 'ENREGISTRER LES MODIFS' : futur ? 'PRÉVOIR POUR ' + esc(MOIS[f.m - 1].toUpperCase()) : 'ENREGISTRER'}</button>
     ${f.mode === 'edit' ? `<button class="ghost" data-act="dup">DUPLIQUER CE MOIS-CI</button><button class="danger ${f.arm ? 'armed' : ''}" data-act="del">${f.arm ? 'TOUCHE ENCORE POUR SUPPRIMER' : 'SUPPRIMER LA LIGNE'}</button>` : ''}</div>`;
-  $('#lib').addEventListener('input', ev => { S.form.lib = ev.target.value; });
+  $('#lib').addEventListener('input', ev => { S.form.lib = ev.target.value; majSugLib(); });
   clavierSaisie();
   const pp = $('#ppart'); if (pp) pp.addEventListener('input', ev => { S.form.part = ev.target.value; majHint(); });
   const pn = $('#pnouv'); if (pn) pn.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); ajoutNom(); } });
@@ -5227,7 +5244,7 @@ document.addEventListener('click', ev => {
     case 'edit': { const e = trouver(el.dataset.id); if (e) ouvrirSaisie(e); break; }
     case 'sens': S.form.sens = el.dataset.s; if (S.form.cat && (S.form.sens === 'retrait') !== estRetraitEp(S.form.cat)) S.form.cat = null; rendreForm(); break;
     case 'type': S.form.type = el.dataset.t; S.form.sens = null; if (S.form.cat && typeDe(S.form.cat) !== S.form.type) S.form.cat = null; rendreForm(); break;
-    case 'cat': S.form.cat = el.dataset.cat; if (S.form.all) { S.form.all = false; rendreForm(); break; } document.querySelectorAll('#sheetIn [data-act=cat]').forEach(c => c.classList.toggle('on', c.dataset.cat === S.form.cat)); majHint(); break;
+    case 'cat': S.form.cat = el.dataset.cat; if (S.form.all) { S.form.all = false; rendreForm(); break; } document.querySelectorAll('#sheetIn [data-act=cat]').forEach(c => c.classList.toggle('on', c.dataset.cat === S.form.cat)); majHint(); majSugLib(); break;
     case 'all': S.form.all = !S.form.all; rendreForm(); break;
     case 'save': enregistrer(); break;
     case 'soon': S.form = { mode: 'soon', k: el.dataset.k }; rendreForm(); ouvrirSheet(); break;
@@ -5363,7 +5380,7 @@ document.addEventListener('click', ev => {
     case 'regaff': LS.set('regAff', !LS.get('regAff', false)); rendreReglages(); break;
     case 'dup': { const e = trouver(S.form.id); if (e) ouvrirSaisie(e, true); break; }
     case 'sgn': S.form.montant = S.form.montant.startsWith('-') ? S.form.montant.slice(1) : '-' + (S.form.montant || ''); majHint(); break;
-    case 'libsug': S.form.lib = el.dataset.l; $('#lib').value = el.dataset.l; break;
+    case 'libsug': { const f = S.form; f.lib = el.dataset.l; if (el.dataset.c && catMap()[el.dataset.c]) { f.cat = el.dataset.c; f.type = typeDe(f.cat); f.sens = null; rendreForm(); break; } $('#lib').value = el.dataset.l; majSugLib(); break; }
     case 'hist-clear': if (!S.form.armH) { S.form.armH = true; rendreSolde(); } else { LS.set('controles', []); S.form.armH = false; toast('Historique vidé'); rendreSolde(); } break;
     case 'ech-new': ouvrirEch(null); break;
     case 'ech-allcat': S.form.all = !S.form.all; rendreEch(); break;
