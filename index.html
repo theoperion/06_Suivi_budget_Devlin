@@ -768,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.20';
+const VERSION = '9.21';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -2032,7 +2032,10 @@ function rendreForm() {
   const fav = favoris(f.type, f.sens), pins = LS.get('pins', []), moisFutur = statut(f.y, f.m) === 'futur', futur = estPrevu(f);
   if (f.cat && !fav.includes(f.cat) && typeDe(f.cat) === f.type && (f.type !== 'Épargne' || (f.sens === 'retrait') === estRetraitEp(f.cat))) fav.unshift(f.cat);
   let chips = fav.map(n => `<button class="chip ${f.cat === n ? 'on' : ''}" data-act="cat" data-cat="${esc(n)}">${pins.includes(n) ? '★ ' : ''}${esc(n)}</button>`).join('');
-  chips += `<button class="chip" data-act="all">${f.all ? 'Moins ▴' : 'Toutes ▾'}</button>`;
+  // (9.21) Une seule catégorie possible (ex. « Épargne ») : choisie d'office, pas de boutons ; « Toutes » seulement s'il en reste à montrer
+  const LT = catsDuType(f.type, f.sens), seule = LT.length === 1;
+  if (seule && f.cat !== LT[0].nom) { f.cat = LT[0].nom; }
+  if (LT.length > fav.length) chips += `<button class="chip" data-act="all">${f.all ? 'Moins ▴' : 'Toutes ▾'}</button>`;
   let tout = '';
   if (f.all) {
     const g = {}; catsDuType(f.type, f.sens).forEach(c => (g[c.groupe] = g[c.groupe] || []).push(c.nom));
@@ -2055,7 +2058,7 @@ function rendreForm() {
       <div style="display:flex;gap:6px"><input class="libin" id="pnouv" placeholder="Ajouter un prénom" autocomplete="off" maxlength="30" style="margin:8px 0"><button class="chip" data-act="pajout" style="margin:8px 0">+</button></div>
       <div style="display:flex;align-items:center;gap:8px"><span class="muted" style="font-size:13px;white-space:nowrap">Ma part</span><input class="libin" id="ppart" inputmode="decimal" placeholder="auto" value="${esc(f.part || '')}" style="margin:0"></div>
       <div class="note" id="presume" style="display:block"></div></div>` : ''}` : ''}
-    <div class="chips">${chips}</div>${tout}
+    ${seule ? '' : `<div class="chips">${chips}</div>${tout}`}
     ${f.type === 'Épargne' ? `${!LS.get('aidesOff', false) ? `<div class="note" style="display:block;margin:-2px 0 8px">${f.sens === 'retrait' ? `Argent que tu <b>sors</b> d'un livret (livret A, LDDS, LEP…), d'un PEA ou d'une assurance vie. Il compte comme une <b>rentrée d'argent</b> ce mois-ci et fait <b>baisser ton épargne nette</b>. Si tu le remets plus tard, saisis-le dans « ↓ Mettre de côté » : les deux s'annulent. Précise le compte dans le libellé (ex. « LDDS »).` : `Argent que tu <b>mets de côté</b> (livrets, PEA, assurance vie, crypto…). Pour de l'argent que tu en sors, choisis « ↑ Retirer de l'épargne ».`}</div>` : ''}
       ${f.sens === 'retrait' && !catsDuType('Épargne', 'retrait').length ? `<div class="note" style="display:block;margin:-2px 0 8px;color:var(--bad)">Aucune catégorie de retrait dans ton fichier : ajoute une catégorie « Retrait d'épargne » (groupe Épargne) dans ⚙ Réglages › Catégories.</div>` : ''}` : ''}
     <input class="libin" id="lib" placeholder="Libellé (facultatif)" value="${esc(f.lib)}" autocomplete="off" maxlength="80">
