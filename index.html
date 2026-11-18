@@ -769,7 +769,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.27';
+const VERSION = '9.28';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1264,7 +1264,19 @@ function avances() {
       else { let r = -e.montant; while (r > 0.005 && p.ouverts.length) { const o = p.ouverts[0], x = Math.min(o.v, r); o.v -= x; r -= x; if (o.v < 0.005) p.ouverts.shift(); } } });
   return Object.values(P).filter(p => p.du > 0.005).sort((a, b) => b.du - a.du);
 }
-function nomsConnus() { const s0 = new Set(); S.journal.forEach(e => { if (!e.deleted && estAv(e.cat)) { const n = personne(e.lib); if (n) s0.add(n); } }); return [...s0].sort(); }
+// (9.28) Prénoms de « Payé pour d'autres » : mémorisés (synchronisés avec le fichier, dans la préférence « envies »)
+// en plus de ceux retrouvés dans les lignes « On te doit ». Les plus utilisés d'abord ; un prénom retiré ne revient pas.
+function nomsConnus() {
+  const P = prefEnvies(), cnt = {}; S.journal.forEach(e => { if (!e.deleted && estAv(e.cat)) { const n = personne(e.lib); if (n) cnt[n] = (cnt[n] || 0) + 1; } });
+  const tous = [...new Set([...P.pn, ...Object.keys(cnt)])].filter(n => !P.px.includes(n));
+  return tous.sort((a, b) => (cnt[b] || 0) - (cnt[a] || 0) || a.localeCompare(b, 'fr'));
+}
+function memoNom(n, retirer) {
+  const P = prefEnvies();
+  if (retirer) { P.pn = P.pn.filter(x => x !== n); if (!P.px.includes(n)) P.px.push(n); }
+  else { P.px = P.px.filter(x => x !== n); if (!P.pn.includes(n)) P.pn.push(n); }
+  sauverEnvies(P);
+}
 function assurerCatAv() {
   if (catMap()[CAT_AV]) return true;
   if (!(S.data.libres > 0)) { toast("Plus de catégorie libre : libère-en une dans Paramètres ① pour suivre les avances"); return false; }
@@ -2082,7 +2094,8 @@ function rendreForm() {
     <div class="hint" id="hint"></div>
     ${f.type === 'Dépense' && !futur ? `<div class="mrow" style="margin:-4px 0 6px;flex-wrap:wrap"><button class="chip ${f.especes ? 'on' : ''}" data-act="esp" aria-pressed="${f.especes ? 'true' : 'false'}">💶 ${f.especes ? '✓ ' : ''}PAYÉ EN ESPÈCES</button>${f.mode === 'add' ? '<button class="lnk" data-act="ret-go">🏧 un retrait ?</button>' : ''}</div><div class="note" id="esphint" style="display:${f.especes ? 'block' : 'none'};text-align:center;margin:-2px 0 8px"></div>` : ''}
     ${f.type === 'Dépense' && f.mode === 'add' && !futur && on('avances') ? `<div class="mrow" style="margin:-4px 0 6px"><button class="chip ${f.partage ? 'on' : ''}" data-act="partage">👥 PAYÉ POUR D'AUTRES</button></div>${f.partage ? `<div class="part">
-      <div class="chips" style="margin:0">${[...new Set([...nomsConnus(), ...(f.noms || [])])].map(n => `<button class="chip ${(f.noms || []).includes(n) ? 'on' : ''}" data-act="pnom" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+      ${(() => { const N = [...new Set([...(f.noms || []), ...nomsConnus()])], MAXN = 6, vis = f.tousNoms || f.gererNoms ? N : N.slice(0, MAXN);
+        return `<div class="chips" style="margin:0">${vis.map(n => f.gererNoms ? `<button class="chip" data-act="pnom-x" data-n="${esc(n)}">✕ ${esc(n)}</button>` : `<button class="chip ${(f.noms || []).includes(n) ? 'on' : ''}" data-act="pnom" data-n="${esc(n)}">${esc(n)}</button>`).join('')}${!f.gererNoms && N.length > MAXN ? `<button class="chip" data-act="pnom-tous">${f.tousNoms ? 'Moins ▴' : '+' + (N.length - MAXN) + ' ▾'}</button>` : ''}${N.length ? `<button class="lnk" data-act="pnom-gerer" style="margin-left:4px">${f.gererNoms ? 'TERMINÉ' : 'GÉRER'}</button>` : ''}</div>${f.gererNoms ? '<div class="note" style="display:block;margin-top:4px">Touche ✕ pour retirer un prénom de ta liste (tes lignes déjà saisies ne changent pas).</div>' : ''}`; })()}
       <div style="display:flex;gap:6px"><input class="libin" id="pnouv" placeholder="Ajouter un prénom" autocomplete="off" maxlength="30" style="margin:8px 0"><button class="chip" data-act="pajout" style="margin:8px 0">+</button></div>
       <div class="grp" style="margin:6px 0 4px">MA PART</div>
       <div class="seg" style="margin:0 0 6px"><button class="${String(f.part || '') === '' ? 'on' : ''}" data-act="ppmode" data-v="">À PARTS ÉGALES</button><button class="${String(f.part) === '0' ? 'on' : ''}" data-act="ppmode" data-v="0">J'AVANCE TOUT (0 €)</button></div>
@@ -2127,7 +2140,7 @@ function partage() {
 }
 function ajoutNom() {
   const i = $('#pnouv'), v = (i ? i.value : '').trim().replace(/·/g, '').slice(0, 30); if (!v) return;
-  const f = S.form; f.noms = f.noms || []; if (!f.noms.includes(v)) f.noms.push(v); rendreForm();
+  const f = S.form; f.noms = f.noms || []; if (!f.noms.includes(v)) f.noms.push(v); memoNom(v); rendreForm();
 }
 function majLibEtat() {
   const f = S.form, l = $('#lib'); if (!f || !l) return;
@@ -4972,7 +4985,8 @@ const ACH_SEUIL = 20, ENV_DELAIS = [2, 7, 14], ENV_MAX = 7000, ENV_GRPS = ['Lois
 const r2 = v => Math.round(v * 100) / 100;
 function prefEnvies() {
   const p = getPref('envies', null), o = p && typeof p === 'object' && !Array.isArray(p) ? JSON.parse(JSON.stringify(p)) : {};
-  return { l: Array.isArray(o.l) ? o.l.filter(x => x && x.i) : [], ren: o.ren || { n: 0, eco: 0 }, ach: o.ach || { n: 0, eco: 0 }, r: o.r && typeof o.r === 'object' ? o.r : {} };
+  const lst = v => Array.isArray(v) ? v.filter(x => typeof x === 'string' && x).slice(0, 40) : [];
+  return { l: Array.isArray(o.l) ? o.l.filter(x => x && x.i) : [], ren: o.ren || { n: 0, eco: 0 }, ach: o.ach || { n: 0, eco: 0 }, r: o.r && typeof o.r === 'object' ? o.r : {}, pn: lst(o.pn), px: lst(o.px) };
 }
 // Trop long : les envies décidées les plus anciennes passent dans les compteurs (rien n'est perdu pour « économisé »)
 function compacterEnvies(p) {
@@ -5343,6 +5357,9 @@ document.addEventListener('click', ev => {
     case 'partage': S.form.partage = !S.form.partage; rendreForm(); break;
     case 'pnom': { const f = S.form, n = el.dataset.n; f.noms = f.noms || []; f.noms = f.noms.includes(n) ? f.noms.filter(x => x !== n) : [...f.noms, n]; rendreForm(); break; }
     case 'pajout': ajoutNom(); break;
+    case 'pnom-tous': S.form.tousNoms = !S.form.tousNoms; rendreForm(); break;
+    case 'pnom-gerer': S.form.gererNoms = !S.form.gererNoms; rendreForm(); break;
+    case 'pnom-x': { const n = el.dataset.n; memoNom(n, true); S.form.noms = (S.form.noms || []).filter(x => x !== n); rendreForm(); break; }
     case 'ppmode': S.form.part = el.dataset.v; rendreForm(); break; // (9.24) parts égales / je prête tout
     case 'remb': ouvrirRemb(el.dataset.n); break;
     case 'remb-ok': okRemb(); break;
