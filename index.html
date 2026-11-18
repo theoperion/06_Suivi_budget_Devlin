@@ -769,7 +769,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.26';
+const VERSION = '9.27';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1875,10 +1875,11 @@ function okFiltre(cat) {
 }
 function lignesMois() {
   const cm = catMap(), q = norm(S.filtre.q || '');
-  return S.journal.filter(e => !e.deleted && e.y === S.y && (q || e.m === S.m))
+  // (9.27) Une recherche porte sur TOUTES les années (sauf si on choisit « cette année »)
+  return S.journal.filter(e => !e.deleted && (q ? (S.filtre.anSeul ? e.y === S.y : true) : e.y === S.y && e.m === S.m))
     .filter(e => okFiltre(e.cat))
     .filter(e => !q || norm(e.lib + ' ' + e.cat).includes(q))
-    .sort((a, b) => (b.m - a.m) || ((b.row == null ? 1e9 : b.row) - (a.row == null ? 1e9 : a.row)))
+    .sort((a, b) => ((b.y || 0) - (a.y || 0)) || (b.m - a.m) || ((b.row == null ? 1e9 : b.row) - (a.row == null ? 1e9 : a.row)))
     .map(e => ({ e, c: cm[e.cat] }));
 }
 function montantLigne(t, v) {
@@ -1887,19 +1888,27 @@ function montantLigne(t, v) {
 }
 function htmlListe() {
   const l = lignesMois();
+  if (!l.length && S.filtre.q) return `<div class="chips" style="margin-top:10px"><button class="chip ${S.filtre.anSeul ? '' : 'on'}" data-act="qan" data-v="0">Toutes les années</button><button class="chip ${S.filtre.anSeul ? 'on' : ''}" data-act="qan" data-v="1">${S.y} seulement</button></div><div class="empty">Aucune ligne ne correspond.</div>`;
   if (!l.length) return `<div class="empty">${S.filtre.q || S.filtre.cat || S.filtre.grp ? 'Aucune ligne saisie ne correspond.' : 'Rien de saisi ce mois-ci. Le + en bas, c\'est par là.'}</div>`;
   let dep = 0, rev = 0;
   const rows = l.map(({ e, c }) => {
     const t = c ? c.type : '';
     if (t === 'Revenu' || t === 'Retrait') rev += e.montant; else dep += e.montant;
-    return `<button class="jl ${e.pending ? 'pend' : ''} ${e.nw ? 'nw' : ''}" data-act="edit" data-id="${e.id}"><div class="l"><div>${esc(e.lib || e.cat)}</div><div class="c">${S.filtre.q ? esc(MC[e.m - 1]) + ' · ' : ''}${esc(e.cat)}${e.date ? ' · le ' + (+e.date.slice(8)) + '/' + esc(e.date.slice(5, 7)) : ''}${e.especes ? ' · <span class="espm">💶 espèces</span>' : ''}${c ? '' : ' · catégorie inconnue'}${e.pending ? ' · envoi…' : ''}</div></div>
+    return `<button class="jl ${e.pending ? 'pend' : ''} ${e.nw ? 'nw' : ''}" data-act="edit" data-id="${e.id}"><div class="l"><div>${esc(e.lib || e.cat)}</div><div class="c">${S.filtre.q ? esc(MC[e.m - 1]) + (S.filtre.anSeul ? '' : ' ' + e.y) + ' · ' : ''}${esc(e.cat)}${e.date ? ' · le ' + (+e.date.slice(8)) + '/' + esc(e.date.slice(5, 7)) : ''}${e.especes ? ' · <span class="espm">💶 espèces</span>' : ''}${c ? '' : ' · catégorie inconnue'}${e.pending ? ' · envoi…' : ''}</div></div>
       ${montantLigne(t, e.montant)}</button>`;
   }).join('');
-  return `<div class="sec" style="margin-top:14px"><span>${l.length} LIGNE${l.length > 1 ? 'S' : ''}${S.filtre.q ? ' EN ' + S.y : ''}</span><span>−${e0(dep)}${rev ? ' · +' + e0(rev) : ''}</span></div>` + rows;
+  let tete = '';
+  if (S.filtre.q) {
+    const parAn = {}; l.forEach(({ e, c }) => { const t = c ? c.type : ''; if (t !== 'Revenu' && t !== 'Retrait') parAn[e.y] = (parAn[e.y] || 0) + e.montant; });
+    const ans = Object.keys(parAn).sort((a, b) => b - a);
+    tete = `<div class="chips" style="margin-top:10px"><button class="chip ${S.filtre.anSeul ? '' : 'on'}" data-act="qan" data-v="0">Toutes les années</button><button class="chip ${S.filtre.anSeul ? 'on' : ''}" data-act="qan" data-v="1">${S.y} seulement</button></div>`
+      + (!S.filtre.anSeul && ans.length > 1 ? `<div class="note" style="display:block;margin-top:6px">${ans.map(a => `${a} : <b>−${e0(parAn[a])}</b>`).join(' · ')}</div>` : '');
+  }
+  return tete + `<div class="sec" style="margin-top:14px"><span>${l.length} LIGNE${l.length > 1 ? 'S' : ''}${S.filtre.q ? (S.filtre.anSeul ? ' EN ' + S.y : ' · TOUTES ANNÉES') : ''}</span><span>−${e0(dep)}${rev ? ' · +' + e0(rev) : ''}</span></div>` + rows;
 }
 function majListe() { const z = $('#liste'); if (z) z.innerHTML = htmlListe(); }
 function vueJournal() {
-  let h = `<div class="search">${ico.search}<input id="q" placeholder="Rechercher dans toute l'année ${S.y}" value="${esc(S.filtre.q)}" autocomplete="off"></div>`;
+  let h = `<div class="search">${ico.search}<input id="q" placeholder="Rechercher (toutes les années)" value="${esc(S.filtre.q)}" autocomplete="off"></div>`;
   if (S.filtre.cat || S.filtre.grp) h += `<div class="chips" style="margin-top:10px"><button class="chip on" data-act="clearcat">${esc(S.filtre.cat || GRPS[S.filtre.grp][0])} ✕</button></div>`;
   if (S.filtre.cat && !S.filtre.q) h += histoBudget(S.filtre.cat);
   const cm = catMap(), av = avenirMois(S.y, S.m).filter(a => okFiltre(a.cat));
@@ -5249,6 +5258,7 @@ document.addEventListener('click', ev => {
     case 'close': fermer(); break;
     case 'allbud': S.allBud = !S.allBud; rendre(true); break;
     case 'anom': S.anomOpen = !S.anomOpen; rendre(true); break;
+    case 'qan': S.filtre.anSeul = el.dataset.v === '1'; majListe(); break;
     case 'budget': S.filtre.cat = el.dataset.cat; S.filtre.q = ''; S.filtre.grp = null; S.tab = 'journal'; rendre(); scrollTo(0, 0); break;
     case 'clearcat': S.filtre.cat = null; S.filtre.grp = null; rendre(true); break;
     case 'edit': { const e = trouver(el.dataset.id); if (e) ouvrirSaisie(e); break; }
@@ -5449,8 +5459,21 @@ document.addEventListener('click', ev => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { const avant = now.toDateString(); majDate(); if (now.toDateString() !== avant || avant !== new Date().toDateString()) rendre(); rafraichir(false); pomper(); } });
 
 /* ================= DÉMARRAGE ================= */
-if (!S.key || (!IN_GAS && !S.api)) verrouiller(); else { rendre(); rafraichir(true); pomper(); if (/[?&]saisie=1/.test(location.search)) ouvrirSaisie(null); }
-if (!IN_GAS && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+if (!S.key || (!IN_GAS && !S.api)) verrouiller(); else { rendre(); rafraichir(true); pomper(); if (/[?&]saisie=1/.test(location.search)) { ouvrirSaisie(null); try { history.replaceState(history.state, '', location.pathname); } catch (e) {} } }
+// (9.27) Mises à jour automatiques : quand une nouvelle version est installée, l'appli se recharge d'elle-même
+// (jamais pendant une saisie : elle attend que la fenêtre soit fermée). Au retour au premier plan (Firefox garde l'appli
+// endormie), on vérifie s'il y a une nouvelle version.
+if (!IN_GAS && 'serviceWorker' in navigator && location.protocol === 'https:') {
+  const avaitSW = !!navigator.serviceWorker.controller; let recharge = false;
+  const rechargerSiLibre = () => { if (!recharge) return; if (document.querySelector('#sheet.on') || document.querySelector('.story')) { setTimeout(rechargerSiLibre, 3000); return; } LS.set('majVue', 1); location.reload(); };
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!avaitSW || recharge) return; recharge = true; rechargerSiLibre(); });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    const verif = () => { try { reg.update(); } catch (e) {} };
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') verif(); });
+    setInterval(verif, 30 * 60 * 1000);
+  }).catch(() => {});
+  if (LS.get('majVue', 0)) { LS.set('majVue', 0); setTimeout(() => { try { toast('Appli mise à jour · version ' + VERSION); } catch (e) {} }, 1500); }
+}
 </script>
 </body>
 </html>
