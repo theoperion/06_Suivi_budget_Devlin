@@ -768,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.16';
+const VERSION = '9.17';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1357,13 +1357,21 @@ function rythmeBudget(x, y, m) {
   const f = now.getDate() / dim(y, m), attendu = x.bud - x.c.budget * (1 - f);
   return Math.round(x.dep - attendu);
 }
+// (9.17) L'encadré parle de TOUS les budgets : mensuels au-dessus de leur rythme ET annuels déjà dépassés sur l'année
+// (avant, il ne regardait que les mensuels et pouvait dire « tout va bien » à côté de « 7 dépassés »).
 function blocEfforts(tous) {
   if (statut(S.y, S.m) !== 'cours') return '';
   const L = tous.map(x => ({ x, r: rythmeBudget(x, S.y, S.m) })).filter(o => o.r != null);
-  if (!L.length) return '';
   const hauts = L.filter(o => o.r >= 1).sort((a, b) => b.r - a.r).slice(0, 3);
-  if (!hauts.length) return `<div class="efforts ok">✓ Tous tes budgets suivent leur rythme à ce jour.</div>`;
-  return `<div class="efforts"><b>OÙ FAIRE DES EFFORTS</b><span>${hauts.map(o => `<button class="eff" data-act="budget" data-cat="${esc(o.x.c.nom)}">${esc(o.x.c.nom)} <em>+${e0(o.r)}</em></button>`).join('')}</span><small>au-dessus de ce qui était prévu à cette date</small></div>`;
+  const anDep = tous.filter(x => x.an && !x.sa && x.annuel > 0 && x.dep > x.annuel + 0.5).map(x => ({ x, r: x.dep - x.annuel })).sort((a, b) => b.r - a.r);
+  if (!L.length && !anDep.length) return '';
+  const chip = o => `<button class="eff" data-act="budget" data-cat="${esc(o.x.c.nom)}">${esc(o.x.c.nom)} <em>+${e0(o.r)}</em></button>`;
+  if (!hauts.length && !anDep.length) return `<div class="efforts ok">✓ Tous tes budgets suivent leur rythme à ce jour.</div>`;
+  let h = `<div class="efforts"><b>OÙ FAIRE DES EFFORTS</b>`;
+  if (hauts.length) h += `<span>${hauts.map(chip).join('')}</span><small>budgets du mois : au-dessus de ce qui était prévu à cette date</small>`;
+  else if (L.length) h += `<small style="display:block;margin-top:4px;color:var(--okInk)">✓ Budgets du mois : tous dans leur rythme.</small>`;
+  if (anDep.length) h += `<span style="margin-top:8px">${anDep.slice(0, 4).map(chip).join('')}</span><small>budgets annuels déjà dépassés sur l'année${anDep.length > 4 ? ' (et ' + (anDep.length - 4) + ' autre' + (anDep.length > 5 ? 's' : '') + ')' : ''} : chaque nouvelle dépense creuse le dépassement</small>`;
+  return h + '</div>';
 }
 // (9.14) Moyennes par mois d'une catégorie sur les 3, 6 et 12 derniers mois terminés (mois avec des saisies),
 // comparées au budget : pour régler les budgets futurs.
@@ -1717,7 +1725,7 @@ function alerteVersion() {
 const INFOS = {
   restant: ['ARGENT RESTANT', "Tes revenus du mois, moins <b>toutes</b> les charges et abonnements de l'échéancier du mois (même ceux pas encore prélevés), moins tes dépenses saisies, ton épargne et ce que tu as avancé pour d'autres. C'est ce qu'il te reste pour finir le mois. Touche le chiffre pour voir à la place ton argent disponible estimé (banque + espèces)."],
   fin: ['FIN DE MOIS PRÉVUE', "C'est une <b>prévision</b> de ce qu'il te restera le dernier jour du mois.<br><br><b>Comment elle est calculée</b> : ton argent restant, moins les prélèvements et achats prévus, moins ce que tes budgets prévoient <b>pour les jours qui restent</b>. Exemple : Loisirs 100 €/mois, on est le 20 (il reste 11 jours sur 30) : l'appli prévoit encore 100 × 11/30 ≈ 37 €, pas tout ce qui reste du budget.<br><br><b>Comment elle bouge</b> : chaque jour où tu dépenses moins que ton budget, elle <b>remonte</b> un peu. Une dépense qui reste dans le rythme de ton budget ne la change pas. Une dépense au-dessus du rythme, ou un budget dépassé, la fait <b>descendre</b> tout de suite.<br><br><b>Le petit « jusqu'à »</b> en dessous : ce qu'il te resterait si tu ne dépensais plus rien dans tes budgets d'ici la fin du mois. Ta vraie fin de mois sera entre les deux.<br><br>Pour la faire remonter, regarde « Où faire des efforts » dans Mes budgets."],
-  budgets: ['MES BUDGETS', "Une barre par budget : ce que tu as dépensé, ce qu'il te reste. Tampon <b>TENU</b>, <b>LIMITE</b> (près du plafond) ou <b>DÉPASSÉ</b>.<br><br><b>Le rythme</b> (budgets mensuels) : on compare ce que tu as dépensé à ce que ton budget prévoyait <b>à cette date</b>. Exemple : 100 €/mois, le 15 → prévu ≈ 50 €. Tu as dépensé 70 € : « ▲ 20 € au-dessus du rythme ». Tu as dépensé 30 € : « ▼ 20 € sous le rythme ». Le petit trait sur la barre marque aujourd'hui.<br><br><b>Où faire des efforts</b> : les budgets les plus au-dessus de leur rythme. C'est là qu'un euro économisé compte le plus pour ta fin de mois.<br><br><b>Budgets annuels</b> (voyage, sorties…) : ils se dépensent par à-coups, donc on les suit sur l'année : ce qu'il reste pour l'année, la part du budget utilisée et la part de l'année écoulée. Si tu as utilisé 70 % du budget alors que 88 % de l'année est passée, tout va bien.<br><br>Les budgets « Sans alerte » (courses…) comptent dans tes prévisions mais n'ont ni rythme ni défis.<br><br>Touche un budget pour voir ses lignes et son historique."],
+  budgets: ['MES BUDGETS', "Une barre par budget : ce que tu as dépensé, ce qu'il te reste. Tampon <b>TENU</b>, <b>LIMITE</b> (près du plafond) ou <b>DÉPASSÉ</b>.<br><br><b>Le rythme</b> (budgets mensuels) : on compare ce que tu as dépensé à ce que ton budget prévoyait <b>à cette date</b>. Exemple : 100 €/mois, le 15 → prévu ≈ 50 €. Tu as dépensé 70 € : « ▲ 20 € au-dessus du rythme ». Tu as dépensé 30 € : « ▼ 20 € sous le rythme ». Le petit trait sur la barre marque aujourd'hui.<br><br><b>Où faire des efforts</b> : les budgets du mois les plus au-dessus de leur rythme, et les budgets annuels déjà dépassés sur l'année. C'est là qu'un euro économisé compte le plus.<br><br><b>Budgets annuels</b> (voyage, sorties…) : ils se dépensent par à-coups, donc on les suit sur l'année : ce qu'il reste pour l'année, la part du budget utilisée et la part de l'année écoulée. Si tu as utilisé 70 % du budget alors que 88 % de l'année est passée, tout va bien.<br><br>Les budgets « Sans alerte » (courses…) comptent dans tes prévisions mais n'ont ni rythme ni défis.<br><br>Touche un budget pour voir ses lignes et son historique."],
   prelever: ['À PRÉLEVER', "Les charges et abonnements de l'échéancier qui ne sont pas encore passés ce mois-ci, plus tes achats prévus. C'est l'argent déjà « réservé »."],
   nd: ['NON DÉPENSÉ', "Depuis janvier : revenus − dépenses. Comprend l'argent resté sur ton compte et celui parti en épargne."],
   courbe: ['SOLDE PRÉVU', "Ton argent (banque + espèces) jour par jour. Trait plein : calculé d'après tes saisies et tes prélèvements jusqu'à aujourd'hui (ce n'est pas ton relevé bancaire). Pointillés : la suite, si tu dépenses tes budgets au rythme prévu (seulement la part des jours qui restent : si tu dépenses moins, la fin de la courbe remonte jour après jour). Points verts : entrées de l'échéancier (salaire…). Points rouges : sorties (loyer, abonnements, virements…) et achats prévus. Une dépense dans le rythme de ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue) ; une dépense au-dessus du rythme ou un dépassement la fait descendre. Sous 0 € : découvert."] };
