@@ -769,7 +769,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.29';
+const VERSION = '9.30';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1212,23 +1212,27 @@ function exclusSerie() {
   return cats().filter(c => estCourante(c.nom) && RE_COURSES.test(c.nom)).map(c => c.nom);
 }
 // Une dépense « casse » la série si c'est une dépense courante hors catégories exclues.
-function casseSerie(cat, ex) { return estCourante(cat) && !(ex || exclusSerie()).includes(cat); }
+// (9.30) Casse un jour sans dépense : une dépense courante, OU une charge fixe (Abonnements, Assurances…) saisie à la main
+// dans le Journal (l'Échéancier n'est jamais dans le Journal, donc les prélèvements automatiques ne cassent rien).
+// Les lignes « Écart … » (correction d'un montant de l'Échéancier) ne cassent rien. Les catégories cochées non plus.
+function estFixeManuelle(cat, lib) { const c = catMap()[cat]; return !!c && c.type === 'Dépense' && FIX.includes(c.groupe) && !estAv(cat) && !/^Écart/.test(String(lib || '').trim()); }
+function casseSerie(cat, ex, lib) { return (estCourante(cat) || estFixeManuelle(cat, lib)) && !(ex || exclusSerie()).includes(cat); }
 // Jours complets sans dépense courante (aujourd'hui n'est compté qu'une fois fini). Date de saisie = colonne « Saisi le » du Journal.
 function joursSansDepense() {
   if (!LS.get('serieDepuis', null)) LS.set('serieDepuis', auj());
   const datees = S.journal.filter(e => !e.deleted && e.date);
   let der = LS.get('derDep', null);
   const ex = exclusSerie();
-  datees.forEach(e => { if (casseSerie(e.cat, ex) && e.montant > 0 && (!der || e.date > der)) der = e.date; });
+  datees.forEach(e => { if (casseSerie(e.cat, ex, e.lib) && e.montant > 0 && (!der || e.date > der)) der = e.date; });
   joursAvecDep().forEach(([a, b]) => { const f = b < auj() ? b : auj(); if (a <= auj() && (!der || f > der)) der = f; }); // jours avec dépenses non saisies
   let dep = LS.get('serieDepuis', auj()); datees.forEach(e => { if (e.date < dep) dep = e.date; });
   const t = new Date(auj() + 'T00:00:00'), ecart = x => Math.round((t - new Date(x + 'T00:00:00')) / 864e5);
   return der ? Math.max(0, ecart(der) - 1) : ecart(dep);
 }
 function rendreExclus() {
-  const f = S.form, L = cats().filter(c => estCourante(c.nom));
+  const f = S.form, L = cats().filter(c => estCourante(c.nom) || estFixeManuelle(c.nom));
   $('#sheetIn').innerHTML = enteteSheet('JOURS SANS DÉPENSE', f.retour || null) + `
-    <div class="note" style="display:block;margin-top:10px">Coche les catégories qui <b>ne cassent pas</b> un jour sans dépense (séries, Novembre sobre, mission du mois, calendrier de l'avent). Les montants restent bien sûr comptés dans tes budgets.</div>
+    <div class="note" style="display:block;margin-top:10px">Coche les catégories qui <b>ne cassent pas</b> un jour sans dépense (séries, Novembre sobre, mission du mois, calendrier de l'avent). Les montants restent bien sûr comptés dans tes budgets. Les prélèvements automatiques de l'Échéancier ne cassent jamais une journée ; une charge fixe (abonnement, assurance…) saisie à la main, oui.</div>
     <div class="chips" style="margin-top:10px">${L.map(c => `<button class="chip ${f.ex.includes(c.nom) ? 'on' : ''}" data-act="exclus-tog" data-cat="${esc(c.nom)}">${f.ex.includes(c.nom) ? '✓ ' : ''}${esc(c.nom)}</button>`).join('')}</div>
     <button class="go" data-act="exclus-ok">ENREGISTRER</button>`;
 }
@@ -2208,7 +2212,7 @@ function enregistrer() {
     if (pa.moi > 0) nouv.push({ lib, cat: f.cat, montant: pa.moi });
     if (pa.chacun > 0) f.noms.forEach(n => nouv.push({ lib: n + ' · ' + objet, cat: CAT_AV, montant: pa.chacun }));
     const es = nouv.map(x => ({ id: uid(), row: null, date: f.date || auj(), mois, lib: x.lib, cat: x.cat, montant: x.montant, especes: !!f.especes, y: f.y, m: f.m, srv: null, pending: true, nw: true }));
-    es.forEach(e => S.journal.push(e)); memo = new Map(); if (casseSerie(f.cat)) noterDepenseDuJour(f.date);
+    es.forEach(e => S.journal.push(e)); memo = new Map(); if (casseSerie(f.cat, null, f.lib)) noterDepenseDuJour(f.date);
     fermer(); S.y = f.y; S.m = f.m; rendre(true);
     toast(`Ta part ${e2(pa.moi)} € · on te doit ${e2(pa.chacun * pa.n)} €`, 'ANNULER', () => es.forEach(e => supprimer(e)));
     es.forEach(e => enfiler({ op: 'add', id: e.id })); return;
@@ -2218,7 +2222,7 @@ function enregistrer() {
     const e = { id: uid(), row: null, date: f.date || auj(), mois, lib, cat: f.cat, montant: n, especes: f.type === 'Dépense' && !!f.especes, y: f.y, m: f.m, srv: null, pending: true, nw: true };
     const use = LS.get('usage', {}); use[f.cat] = (use[f.cat] || 0) + 1; LS.set('usage', use);
     S.journal.push(e); memo = new Map();
-    if (casseSerie(e.cat) && e.y === now.getFullYear() && e.m === now.getMonth() + 1) noterDepenseDuJour(e.date);
+    if (casseSerie(e.cat, null, e.lib) && e.y === now.getFullYear() && e.m === now.getMonth() + 1) noterDepenseDuJour(e.date);
     const b = f.type === 'Dépense' ? budgetDe(e.cat, e.y, e.m) : null;
     if (b && b.etat === 'bad' && (!avant || avant.etat !== 'bad')) S.pop = e.cat;
     fermer(); S.y = e.y; S.m = e.m; rendre(true);
@@ -2762,7 +2766,7 @@ function avPayer() {
   const fut = f.y * 12 + f.m > nowYM(), y = fut ? now.getFullYear() : f.y, m = fut ? now.getMonth() + 1 : f.m;
   const jr = !fut && f.jour ? y + '-' + pad2(m) + '-' + pad2(Math.min(f.jour, dim(y, m))) : null;
   const e = { id: uid(), row: null, date: jr && jr <= auj() ? jr : auj(), mois: moisLabel(y, m), lib: f.lib.trim(), cat: f.cat, montant: n, y, m, srv: null, pending: true, nw: true };
-  S.journal.push(e); a.fait = true; memo = new Map(); if (casseSerie(e.cat)) noterDepenseDuJour(e.date); fermer(); S.y = y; S.m = m; rendre(true);
+  S.journal.push(e); a.fait = true; memo = new Map(); if (casseSerie(e.cat, null, e.lib)) noterDepenseDuJour(e.date); fermer(); S.y = y; S.m = m; rendre(true);
   toast(`${e.lib} : payé, ajouté au Journal de ${MOIS[m - 1]}`);
   enfiler({ op: 'av-paye', id: a.id, jid: e.id });
 }
@@ -3025,7 +3029,7 @@ function joursJeuCalc() {
   // Un jour ne compte que si l'appli est utilisée : une ligne saisie depuis l'appli ce mois-ci OU le mois d'avant.
   // (Avant : il fallait une dépense courante dans le mois même, donc le 1er novembre ne comptait jamais.)
   const ex = exclusSerie(), datees = S.journal.filter(e => !e.deleted && e.date && e.montant > 0);
-  const dep = new Set(datees.filter(e => casseSerie(e.cat, ex)).map(e => e.date));
+  const dep = new Set(datees.filter(e => casseSerie(e.cat, ex, e.lib)).map(e => e.date));
   const moisVivants = new Set(datees.map(e => e.date.slice(0, 7)));
   const prec = k => { const y = +k.slice(0, 4), m = +k.slice(5, 7); return m > 1 ? y + '-' + String(m - 1).padStart(2, '0') : (y - 1) + '-12'; };
   const vivant = k => moisVivants.has(k.slice(0, 7)) || moisVivants.has(prec(k));
@@ -3056,7 +3060,7 @@ function faitsJeu() {
   const v = {
     M, J, cote, nCote: coteL.length, nCoteMois, rembs, defisLances,
     serieJours: maxSerie(J.map(x => x[1])),
-    serieJoursCur: S.journal.some(e => !e.deleted && e.date === auj() && e.montant > 0 && casseSerie(e.cat)) ? 0 : finSerie(J.map(x => x[1])),
+    serieJoursCur: S.journal.some(e => !e.deleted && e.date === auj() && e.montant > 0 && casseSerie(e.cat, null, e.lib)) ? 0 : finSerie(J.map(x => x[1])),
     vertCur: finSerie(M.map(x => x.vert)), zeroCur: finSerie(M.map(x => x.zero)), defiCur: finSerie(M.map(x => x.defiOk)),
     epargne: moisJeu().reduce((t, [y, m]) => t + calc(y, m).epV, 0) + epargneCourante(), // réellement versée : pas les virements à venir
     joursSans: J.filter(x => x[1] === true).length,
@@ -3328,6 +3332,12 @@ function detailXP(e) {
   e.succes.filter(s => s.ok).forEach(s => { o['s:' + s.id] = DIFF[s.d].xp; });
   return o;
 }
+// (9.30) Journal d'XP : pour un jour sans dépense gagné, préciser la journée concernée (la veille de l'inscription)
+function libXPLog(x) {
+  if (x.k.slice(2) === 'Jours sans dépense courante' && x.v > 0 && x.v <= 5) { const d = addJ(x.j, -1); return 'Journée du ' + (+d.slice(8)) + ' ' + MC[+d.slice(5, 7) - 1] + ' sans dépense courante'; }
+  if (x.k.slice(2) === 'Jours sans dépense courante') return x.v > 0 ? 'Jours terminés sans dépense courante' : 'Jour sans dépense annulé (dépense ajoutée ou corrigée)';
+  return libXP(x.k);
+}
 function libXP(k) {
   if (k.startsWith('s:')) { const s = SUCCES.find(x => 's:' + x.id === k); return 'Succès « ' + (s ? s.nom : k.slice(2)) + ' »'; }
   return k.slice(2);
@@ -3365,7 +3375,7 @@ function blocDetailXP(e) {
   h += `<div class="sec" id="xpjournal"><span>JOURNAL DE L'XP</span><span>SUR CE TÉLÉPHONE</span></div>`;
   if (!L.length) h += `<div class="note" style="display:block;margin-top:0">Le prochain gain (ou la prochaine perte) d'XP s'affichera ici avec sa raison.</div>`;
   else {
-    h += `<div class="ticket">${L.slice(0, S.allXp ? L.length : 8).map(x => `<div class="tl"><span>${esc(libXP(x.k))} <small class="muted" style="letter-spacing:0">${x.j.slice(8)}/${x.j.slice(5, 7)}${x.j.slice(0, 4) !== an ? '/' + x.j.slice(2, 4) : ''} ${esc(x.h || '')}</small></span><span class="${x.v > 0 ? 'c-ok' : 'c-bad'}">${x.v > 0 ? '+' : '−'}${Math.abs(x.v)}</span></div>`).join('')}</div>`;
+    h += `<div class="ticket">${L.slice(0, S.allXp ? L.length : 8).map(x => `<div class="tl"><span>${esc(libXPLog(x))} <small class="muted" style="letter-spacing:0">${x.j.slice(8)}/${x.j.slice(5, 7)}${x.j.slice(0, 4) !== an ? '/' + x.j.slice(2, 4) : ''} ${esc(x.h || '')}</small></span><span class="${x.v > 0 ? 'c-ok' : 'c-bad'}">${x.v > 0 ? '+' : '−'}${Math.abs(x.v)}</span></div>`).join('')}</div>`;
     if (L.length > 8) h += `<button class="chip" style="margin-top:8px" data-act="xplog">${S.allXp ? 'Moins ▴' : 'Tout le journal (' + L.length + ') ▾'}</button>`;
   }
   h += `<div class="note" style="display:block;margin-top:8px">Une perte d'XP veut dire qu'un fait a été recalculé : une ligne supprimée ou corrigée, une dépense saisie après coup sur un jour qui était « sans dépense »…</div>`;
