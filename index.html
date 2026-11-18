@@ -768,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.17';
+const VERSION = '9.18';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1639,7 +1639,7 @@ function blocConseils() {
 }
 // Solde prévu jour par jour, d'aujourd'hui à la fin du mois prochain :
 // prélèvements à leur date, achats prévus, et budgets restants étalés sur les jours.
-function courbeSolde() {
+function courbeSolde(yT, mT) { // (9.18) yT/mT : prolonge la prévision jusqu'à ce mois (sinon : mois en cours + suivant)
   const y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate();
   let s = soldeCalcule(y, m); if (s == null) return null;
   const cm = catMap(), oc0 = occurrences(y, m), iso = j => y + '-' + String(m).padStart(2, '0') + '-' + String(j).padStart(2, '0');
@@ -1651,7 +1651,8 @@ function courbeSolde() {
     t -= ev.reduce((a, e) => a + e.v, 0) + S.journal.filter(e => !e.deleted && e.date === iso(j) && e.montant && cm[e.cat]).reduce((a, e) => a + signe(cm[e.cat].type) * e.montant, 0);
   }
   s = pts[pts.length - 1].s;
-  [[y, m], [m === 12 ? y + 1 : y, m === 12 ? 1 : m + 1]].forEach(([yy, mm], k) => {
+  const MS = [[y, m]]; { let yy = y, mm = m; const fin = yT ? Math.max(yT * 12 + mT, y * 12 + m + 1) : y * 12 + m + 1; while (yy * 12 + mm < fin) { mm++; if (mm > 12) { mm = 1; yy++; } MS.push([yy, mm]); } }
+  MS.forEach(([yy, mm], k) => {
     const b = bilan(yy, mm), nbj = dim(yy, mm), j0 = k === 0 ? d : 0, reste = nbj - j0;
     const parJour = reste > 0 ? Math.max(0, k === 0 ? b.resteBud : b.prevVar) / reste : 0;
     const oc = occurrences(yy, mm), av = avenirMois(yy, mm);
@@ -1674,11 +1675,32 @@ function graduations(mn, mx) {
   for (let v = lo; v <= hi + pas / 2; v += pas) out.push(Math.round(v * 100) / 100);
   return out.length > 1 ? out : [lo, lo + pas];
 }
-function cartePointBas() {
-  const pts = courbeSolde();
+// (9.18) Courbe du solde pour n'importe quel mois : en cours (calculé puis prévu), passé (reconstitué jour par jour
+// d'après les saisies datées et l'Échéancier ; les lignes sans date comptent le dernier jour), à venir (tout prévu).
+function courbeSoldeMois(y, m) {
+  const st = statut(y, m);
+  if (st === 'cours') { const P = courbeSolde(); if (P) P.mode = 'cours'; return P; }
+  if (st === 'futur') {
+    if (y * 12 + m > nowYM() + 12) return null;
+    const P = courbeSolde(y, m); if (!P) return null;
+    const Q = P.filter(p => p.y === y && p.m === m); Q.auj = 0; Q.mode = 'futur'; return Q;
+  }
+  const E = soldeCalcule(y, m); if (E == null) return null;
+  const nbj = dim(y, m), cm = catMap(), oc = occurrences(y, m), iso = j => y + '-' + String(m).padStart(2, '0') + '-' + String(j).padStart(2, '0');
+  let s = E - calc(y, m).restant; const P = [];
+  for (let j = 1; j <= nbj; j++) {
+    const ev = oc.filter(o => Math.min(o.jour || 1, nbj) === j).map(o => ({ lib: o.lib, v: signe(o.type) * o.v }));
+    s += ev.reduce((a, e) => a + e.v, 0) + S.journal.filter(e => !e.deleted && e.y === y && e.m === m && e.date === iso(j) && e.montant && cm[e.cat]).reduce((a, e) => a + signe(cm[e.cat].type) * e.montant, 0);
+    P.push({ y, m, j, s, ev, passe: true });
+  }
+  const diff = E - s; if (Math.abs(diff) > 0.005) P[nbj - 1].s += diff; // lignes sans date (ou datées hors du mois) : en fin de mois
+  P.auj = nbj - 1; P.mode = 'passe'; return P;
+}
+function cartePointBas(yC, mC) {
+  const pts = yC ? courbeSoldeMois(yC, mC) : courbeSolde(), mode = (pts && pts.mode) || 'cours';
   if (!pts) return `<button class="pbas" data-act="ctrl"><div class="pbh"><span>POINT BAS PRÉVU</span><b>—</b></div><div class="pbs">Indisponible : l'appli ne connaît pas encore ton solde. Touche ici et tape ce qu'il y a sur ton compte.</div></button>`;
   if (pts.length < 3) return '';
-  const it = pts.auj, fut = pts.slice(it), bas = fut.reduce((a, p) => p.s < a.s ? p : a, fut[0]);
+  const it = pts.auj, fut = mode === 'passe' ? pts : pts.slice(it), bas = fut.reduce((a, p) => p.s < a.s ? p : a, fut[0]), fin = pts[pts.length - 1];
   const cls = bas.s < 0 ? 'c-bad' : bas.s < 100 ? 'c-warn' : 'c-ok';
   const W = 320, H = 116, PT = 10, PB = 8;
   const vmn = Math.min(...pts.map(p => p.s)), vmx = Math.max(...pts.map(p => p.s));
@@ -1692,9 +1714,9 @@ function cartePointBas() {
   const pct = i => (X(i) / W * 100).toFixed(2) + '%';
   const points = idx.map(({ p, i }) => ({ i, p, v: (p.ev || []).reduce((t, e) => t + e.v, 0) })).filter(x => Math.abs(x.v) >= 1);
   return `<button class="pbas ${bas.s < 0 ? 'decouvert' : ''}" data-act="tab:prevu">
-    ${bas.s < 0 ? `<div class="decban">⚠ DÉCOUVERT PRÉVU LE ${bas.j} ${MC[bas.m - 1].toUpperCase()} · ${e0(bas.s)}</div>` : ''}
-    <div class="pbh"><span>SOLDE PRÉVU · POINT BAS ${qi('courbe')}</span><b class="${cls}">${e0(bas.s)}</b></div>
-    <div class="pbs">le ${bas.j} ${MC[bas.m - 1]}${bas.s < 0 ? ' · risque de découvert' : ''} · si tu tiens tes budgets</div>
+    ${bas.s < 0 && mode !== 'passe' ? `<div class="decban">⚠ DÉCOUVERT PRÉVU LE ${bas.j} ${MC[bas.m - 1].toUpperCase()} · ${e0(bas.s)}</div>` : ''}
+    <div class="pbh"><span>${mode === 'passe' ? 'SOLDE DU MOIS · POINT BAS' : 'SOLDE PRÉVU · POINT BAS'} ${qi('courbe')}</span><b class="${cls}">${e0(bas.s)}</b></div>
+    <div class="pbs">le ${bas.j} ${MC[bas.m - 1]}${mode === 'passe' ? (bas.s < 0 ? ' · à découvert' : '') + ' · fin du mois : ' + e0(fin.s) : (bas.s < 0 ? ' · risque de découvert' : '') + ' · si tu tiens tes budgets' + (mode === 'futur' ? ' · fin du mois : ' + e0(fin.s) : '')}</div>
     <div style="display:flex;gap:6px;margin-top:14px">
       <div style="position:relative;width:40px;height:${H}px;flex-shrink:0;font-size:9px;color:var(--ink3);text-align:right">${gr.map(t => `<span style="position:absolute;right:0;top:${(Y(t) / H * 100).toFixed(1)}%;transform:translateY(-50%);white-space:nowrap" class="${t < 0 ? 'c-bad' : ''}">${kEu(t)} €</span>`).join('')}</div>
       <div class="pbg" style="flex:1;min-width:0;height:${H}px">
@@ -1705,18 +1727,18 @@ function cartePointBas() {
           ${mn < 0 ? `<clipPath id="pbneg"><rect x="0" y="${Y(0)}" width="${W}" height="${H}"/></clipPath><rect x="0" y="${Y(0)}" width="${W}" height="${H - PB - Y(0)}" fill="var(--bad)" opacity=".12"/>` : ''}
           <path d="${aire}" fill="url(#pbgrad)"/>
           ${mn < 0 ? `<path d="${aire}" fill="var(--bad)" opacity=".35" clip-path="url(#pbneg)"/>` : ''}
-          <path d="${chemin(idx.slice(0, it + 1))}" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
-          <path d="${chemin(idx.slice(it))}" fill="none" stroke="var(--ink2)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+          ${mode !== 'futur' ? `<path d="${chemin(idx.slice(0, it + 1))}" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` : ''}
+          ${mode === 'passe' ? '' : `<path d="${chemin(idx.slice(it))}" fill="none" stroke="var(--ink2)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`}
           ${mn < 0 ? `<path d="${chemin(idx)}" fill="none" stroke="var(--bad)" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke" clip-path="url(#pbneg)"/>` : ''}
-          <line x1="${X(it)}" x2="${X(it)}" y1="0" y2="${H - PB}" stroke="var(--acc,var(--ok))" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+          ${mode === 'cours' ? `<line x1="${X(it)}" x2="${X(it)}" y1="0" y2="${H - PB}" stroke="var(--acc,var(--ok))" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : ''}
         </svg>
         ${points.map(x => `<span class="pbpt" style="left:${pct(x.i)};top:${(Y(x.p.s) / H * 100).toFixed(1)}%;background:${x.v > 0 ? 'var(--ok)' : 'var(--bad)'}"></span>`).join('')}
-        <span class="pbcur" style="left:${pct(it)};top:${(Y(pts[it].s) / H * 100).toFixed(1)}%"></span>
-        <span class="pbauj" style="left:${pct(it)};transform:translateX(${X(it) / W < 0.08 ? '-10%' : X(it) / W > 0.9 ? '-90%' : '-50%'})">AUJ. ${now.getDate()}</span>
+        ${mode === 'cours' ? `<span class="pbcur" style="left:${pct(it)};top:${(Y(pts[it].s) / H * 100).toFixed(1)}%"></span>
+        <span class="pbauj" style="left:${pct(it)};transform:translateX(${X(it) / W < 0.08 ? '-10%' : X(it) / W > 0.9 ? '-90%' : '-50%'})">AUJ. ${now.getDate()}</span>` : ''}
       </div>
     </div>
     <div class="pbs" style="position:relative;height:14px;margin:6px 0 0 46px">${ticks.filter(({ i }, k, A) => k === 0 || (X(i) - X(A[k - 1].i)) / W > 0.17).map(({ p, i }) => `<span style="position:absolute;left:${pct(i)};transform:translateX(${X(i) / W < 0.04 ? '0' : X(i) / W > 0.92 ? '-100%' : '-50%'});white-space:nowrap;${p.j === 1 ? 'font-weight:600;color:var(--ink2)' : ''}">${p.j === 1 ? '1er ' : p.j + ' '}${MC[p.m - 1]}</span>`).join('')}</div>
-    <div class="pbleg"><span><i></i>calculé</span><span><i style="background:repeating-linear-gradient(90deg,var(--ink2) 0 4px,transparent 4px 7px)"></i>prévu</span><span><i style="width:2px;height:10px;background:var(--acc,var(--ok))"></i>aujourd'hui</span><span class="c-ok">● entrée</span><span class="c-bad">● sortie</span></div></button>`;
+    <div class="pbleg">${mode !== 'futur' ? '<span><i></i>calculé</span>' : ''}${mode !== 'passe' ? '<span><i style="background:repeating-linear-gradient(90deg,var(--ink2) 0 4px,transparent 4px 7px)"></i>prévu</span>' : ''}${mode === 'cours' ? '<span><i style="width:2px;height:10px;background:var(--acc,var(--ok))"></i>aujourd\'hui</span>' : ''}<span class="c-ok">● entrée</span><span class="c-bad">● sortie</span></div></button>`;
 }
 function alerteVersion() {
   if (IN_GAS || !S.data || versionAuMoins(S.data.apiVersion, API_ATTENDUE)) return '';
@@ -1728,7 +1750,7 @@ const INFOS = {
   budgets: ['MES BUDGETS', "Une barre par budget : ce que tu as dépensé, ce qu'il te reste. Tampon <b>TENU</b>, <b>LIMITE</b> (près du plafond) ou <b>DÉPASSÉ</b>.<br><br><b>Le rythme</b> (budgets mensuels) : on compare ce que tu as dépensé à ce que ton budget prévoyait <b>à cette date</b>. Exemple : 100 €/mois, le 15 → prévu ≈ 50 €. Tu as dépensé 70 € : « ▲ 20 € au-dessus du rythme ». Tu as dépensé 30 € : « ▼ 20 € sous le rythme ». Le petit trait sur la barre marque aujourd'hui.<br><br><b>Où faire des efforts</b> : les budgets du mois les plus au-dessus de leur rythme, et les budgets annuels déjà dépassés sur l'année. C'est là qu'un euro économisé compte le plus.<br><br><b>Budgets annuels</b> (voyage, sorties…) : ils se dépensent par à-coups, donc on les suit sur l'année : ce qu'il reste pour l'année, la part du budget utilisée et la part de l'année écoulée. Si tu as utilisé 70 % du budget alors que 88 % de l'année est passée, tout va bien.<br><br>Les budgets « Sans alerte » (courses…) comptent dans tes prévisions mais n'ont ni rythme ni défis.<br><br>Touche un budget pour voir ses lignes et son historique."],
   prelever: ['À PRÉLEVER', "Les charges et abonnements de l'échéancier qui ne sont pas encore passés ce mois-ci, plus tes achats prévus. C'est l'argent déjà « réservé »."],
   nd: ['NON DÉPENSÉ', "Depuis janvier : revenus − dépenses. Comprend l'argent resté sur ton compte et celui parti en épargne."],
-  courbe: ['SOLDE PRÉVU', "Ton argent (banque + espèces) jour par jour. Trait plein : calculé d'après tes saisies et tes prélèvements jusqu'à aujourd'hui (ce n'est pas ton relevé bancaire). Pointillés : la suite, si tu dépenses tes budgets au rythme prévu (seulement la part des jours qui restent : si tu dépenses moins, la fin de la courbe remonte jour après jour). Points verts : entrées de l'échéancier (salaire…). Points rouges : sorties (loyer, abonnements, virements…) et achats prévus. Une dépense dans le rythme de ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue) ; une dépense au-dessus du rythme ou un dépassement la fait descendre. Sous 0 € : découvert."] };
+  courbe: ['SOLDE PRÉVU', "Ton argent (banque + espèces) jour par jour. Elle s'affiche pour tous les mois : un mois passé est reconstitué d'après tes saisies datées et tes prélèvements (les lignes sans date comptent le dernier jour), un mois à venir est entièrement prévu. Trait plein : calculé d'après tes saisies et tes prélèvements jusqu'à aujourd'hui (ce n'est pas ton relevé bancaire). Pointillés : la suite, si tu dépenses tes budgets au rythme prévu (seulement la part des jours qui restent : si tu dépenses moins, la fin de la courbe remonte jour après jour). Points verts : entrées de l'échéancier (salaire…). Points rouges : sorties (loyer, abonnements, virements…) et achats prévus. Une dépense dans le rythme de ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue) ; une dépense au-dessus du rythme ou un dépassement la fait descendre. Sous 0 € : découvert."] };
 const qi = k => LS.get('aidesOff', false) ? '' : `<span class="qi" data-act="info" data-k="${k}" role="button" aria-label="Explication">?</span>`;
 // Détail des écritures pas encore envoyées au fichier, avec la dernière erreur
 function descOp(o) {
@@ -1799,7 +1821,7 @@ function vueAccueil() {
   const ap = aPrelever(S.y, S.m); if (ap != null) pills.push(`<button class="pill" data-act="tab:prevu"><small>À PRÉLEVER ${qi('prelever')}</small><b>${e0(ap)}</b></button>`);
   const nd = nonDepense(S.y); if (nd != null) pills.push(`<button class="pill ${nd < 0 ? 'p-bad' : ''}" data-act="stats-an"><small>NON DÉPENSÉ ${S.y} ${qi('nd')}</small><b>${sg0(nd)}</b></button>`);
   if (pills.length) h += `<div class="pills" style="grid-template-columns:repeat(${pills.length},1fr)">${pills.join('')}</div>`;
-  if (b.st === 'cours' && on('pointbas')) h += cartePointBas();
+  if (on('pointbas')) h += cartePointBas(S.y, S.m); // (9.18) tous les mois : passés reconstitués, à venir prévus
   h += `</div>`; // (9.6) plus de lien « Mode d'emploi » ici : il est dans ⚙ Réglages
   if (b.st === 'cours' && on('avances')) h += blocAvances();
   h += `<div class="sec"><span>TICKET DU MOIS</span></div><div class="ticket">
