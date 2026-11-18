@@ -768,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.22';
+const VERSION = '9.23';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -2203,6 +2203,7 @@ function lierChamps() {
     S.form[i.dataset.f] = ev.target.value;
     if (S.form.mode === 'solde') majSolde();
     if (S.form.mode === 'achats') majTexteTaux();
+    if (S.form.mode === 'objedit') majObjMois();
     if (S.form.mode === 'ech') { majEchApercu(); majReel(); }
   }));
 }
@@ -4261,17 +4262,25 @@ function blocObjectif() {
     ${(() => { const B = bilanEpargne(y); return `<div class="note" style="display:block;text-align:center;margin:0 0 4px">Épargne nette depuis janvier : versé <b>${e0(B.verse)}</b> · retiré <b>${e0(B.retire)}</b> · net <b class="${B.net < 0 ? 'c-bad' : ''}">${B.net < 0 ? '−' + e0(-B.net) : e0(B.net)}</b>${B.net < 0 ? '<br>Tu as plus retiré que versé cette année.' : ''} · <button class="lnk" data-act="obj-detail">VOIR LE DÉTAIL ›</button></div>`; })()}
     <div class="note" style="display:block;text-align:center;margin-top:4px">${o.atteint ? '🎉 Objectif atteint, bravo !' : `${o.ecart >= 0 ? `<b class="c-ok">En avance de ${e0(o.ecart)}</b>` : `<b class="c-bad">En retard de ${e0(-o.ecart)}</b>`} sur le rythme prévu · encore <b>${e0(o.parMois)}/mois</b> d'ici décembre`}${o.proj != null && !o.atteint ? `<br>À ce rythme, tu finis l'année à <b>${e0(o.proj)}</b>` : ''}</div></div>`;
 }
+// (9.23) Objectif d'épargne : montant pour l'ANNÉE, avec son équivalent par mois affiché en direct.
+// Suggestions : ton rythme réel (épargne nette des 6 derniers mois terminés, sans les prêts) et 10 % de tes revenus.
+function epNetMois(y, m) { return versementsEpargne(y).filter(x => x.m === m && !x.pret).reduce((t, x) => t + (x.retrait ? -x.v : x.v), 0); }
+function majObjMois() { const z = $('#objmois'); if (!z) return; const n = numTxt(S.form.montant || ''); z.innerHTML = n > 0 ? `soit <b>≈ ${e0(n / 12)} par mois</b> pendant 12 mois` : "Montant pour <b>toute l'année</b> (pas par mois)."; }
 function rendreObjEdit() {
   const f = S.form;
-  let t = 0, n = 0; for (let k = 1; k <= 6; k++) { let yy = now.getFullYear(), mm = now.getMonth() + 1 - k; while (mm < 1) { mm += 12; yy--; } if (moisActif(yy, mm)) { t += calc(yy, mm).ep; n++; } }
-  const sug = n ? Math.max(100, Math.round(t / n * 12 / 100) * 100) : 0;
+  let t = 0, rv = 0, n = 0; for (let k = 1; k <= 6; k++) { let yy = now.getFullYear(), mm = now.getMonth() + 1 - k; while (mm < 1) { mm += 12; yy--; } if (moisActif(yy, mm)) { t += epNetMois(yy, mm); const P = calc(yy, mm).par; rv += calc(yy, mm).rev - Object.keys(P).filter(estRetraitEp).reduce((z, k) => z + P[k].j + P[k].e, 0); n++; } }
+  const r100 = v => Math.round(v / 100) * 100, ryt = n ? r100(t / n * 12) : 0, dix = n ? r100(rv / n * 12 * 0.1) : 0;
+  const sug = (v, txt) => `<button class="chip sug" data-act="obj-sug" data-v="${v}" style="display:block;width:100%;text-align:left;margin-top:6px;white-space:normal;height:auto;line-height:1.35;padding:8px 12px"><b>${e0(v)} par an</b> · ≈ ${e0(v / 12)}/mois · ${txt}</button>`;
   $('#sheetIn').innerHTML = enteteSheet("OBJECTIF D'ÉPARGNE " + f.y, null) + `
-    <div class="note" style="display:block;margin-top:10px">La jauge compte ton épargne nette : versements de l'année (Échéancier compris, à sa date) moins tes retraits d'épargne. Les prêts à des proches ne comptent pas.</div>
-    <input class="libin" data-f="montant" inputmode="decimal" placeholder="Montant pour l'année en €" value="${esc(f.montant)}" style="margin-top:12px">
-    ${sug ? `<button class="chip sug" data-act="obj-sug" data-v="${sug}">Suggestion : ${e0(sug)} (ton rythme des 6 derniers mois)</button>` : ''}
+    <div class="note" style="display:block;margin-top:10px">Combien veux-tu mettre de côté <b>sur toute l'année ${f.y}</b> ? La jauge compte ton épargne nette : versements (Échéancier compris, à sa date) moins retraits d'épargne. Les prêts à des proches ne comptent pas.</div>
+    <input class="libin" data-f="montant" inputmode="decimal" placeholder="Montant pour l'année ${f.y} en €" value="${esc(f.montant)}" style="margin-top:12px">
+    <div class="note" id="objmois" style="display:block;margin:4px 0 0"></div>
+    ${ryt > 0 || dix > 0 ? `<div class="grp" style="margin-top:12px">SUGGESTIONS</div>` : ''}
+    ${ryt > 0 ? sug(ryt, 'ton rythme réel des ' + n + ' derniers mois') : ''}
+    ${dix > 0 && Math.abs(dix - ryt) >= 100 ? sug(dix, '10 % de tes revenus (repère classique)') : ''}
     <div class="err" id="ferr"></div><button class="go" data-act="obj-ok">ENREGISTRER</button>
     ${f.existe ? `<button class="danger" data-act="obj-del">RETIRER L'OBJECTIF</button>` : ''}`;
-  lierChamps();
+  lierChamps(); majObjMois();
 }
 
 // --- Résumé du dimanche ---
@@ -5223,7 +5232,7 @@ document.addEventListener('click', ev => {
     case 'obj-edit': { const y = now.getFullYear(), o = objectifs()[y]; S.form = { mode: 'objedit', y, montant: o ? String(o) : '', existe: !!o }; rendreForm(); ouvrirSheet(); break; }
     case 'obj-detail': S.form = { mode: 'objdetail', y: now.getFullYear() }; rendreForm(); ouvrirSheet(); break;
     case 'obj-sug': S.form.montant = el.dataset.v; rendreObjEdit(); break;
-    case 'obj-ok': { const n = parseFloat(String(S.form.montant || '').replace(/\s/g, '').replace(',', '.')); if (!(n > 0)) { $('#ferr').textContent = 'Tape un montant'; break; } const O = Object.assign({}, objectifs()); const oy = S.form.y; O[oy] = Math.round(n); setPref('objectifs', O); fermer(); rendre(true); toast('Objectif ' + oy + ' : ' + e0(n)); break; }
+    case 'obj-ok': { const n = numTxt(String(S.form.montant || '')); if (!(n > 0)) { $('#ferr').textContent = 'Tape un montant'; break; } const O = Object.assign({}, objectifs()); const oy = S.form.y; O[oy] = Math.round(n); setPref('objectifs', O); fermer(); rendre(true); toast('Objectif ' + oy + ' : ' + e0(n) + ' sur l\'année (≈ ' + e0(n / 12) + '/mois)'); break; }
     case 'obj-del': { const O = Object.assign({}, objectifs()); delete O[S.form.y]; setPref('objectifs', O); fermer(); rendre(true); toast('Objectif retiré'); break; }
     case 'res-ban': LS.set('resumeVu', el.dataset.k); rendre(true); S.form = { mode: 'resume', k: el.dataset.k }; rendreForm(); ouvrirSheet(); break;
     case 'res-open': S.form = { mode: 'resume', k: el.dataset.k }; rendreForm(); ouvrirSheet(); break;
