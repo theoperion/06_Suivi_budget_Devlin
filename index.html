@@ -769,7 +769,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.28';
+const VERSION = '9.29';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -3270,7 +3270,10 @@ function annoncerJeu() {
 }
 // --- Annonce explicite des gains : une carte, une ligne par gain avec son XP (succès, événements, défis, jours…) ---
 const GAINS_LIB = {
-  'Jours sans dépense courante': n => n + ' jour' + (n > 1 ? 's' : '') + ' sans dépense', 'Mois bouclés': n => n > 1 ? n + ' mois bouclés' : 'Mois bouclé',
+  // (9.29) Un jour n'est compté qu'une fois TERMINÉ : l'annonce du matin dit donc « hier » (avant : on croyait que c'était aujourd'hui)
+  'Jours sans dépense courante': n => { const J = joursJeu(), d = J.length ? J[J.length - 1] : null;
+    if (n === 1 && d && d[1] && d[0] === addJ(auj(), -1)) return 'Hier (' + (+d[0].slice(8)) + ' ' + MC[+d[0].slice(5, 7) - 1] + ') : journée terminée sans dépense courante';
+    return n + ' jour' + (n > 1 ? 's' : '') + ' terminé' + (n > 1 ? 's' : '') + ' sans dépense courante'; }, 'Mois bouclés': n => n > 1 ? n + ' mois bouclés' : 'Mois bouclé',
   'Mois dans le vert': n => (n > 1 ? n + ' mois' : 'Mois') + ' dans le vert', 'Défis réussis': n => n > 1 ? n + ' défis du mois réussis' : 'Défi du mois réussi',
   'Restes mis de côté': n => n > 1 ? n + ' restes mis de côté' : 'Reste du mois mis de côté', 'Mois sans budget dépassé': n => (n > 1 ? n + ' mois' : 'Mois') + ' sans budget dépassé',
   'Mois à 10 % non dépensés': n => (n > 1 ? n + ' mois' : 'Mois') + ' à 10 % non dépensés', 'Mois à 25 % non dépensés': n => (n > 1 ? n + ' mois' : 'Mois') + ' à 25 % non dépensés',
