@@ -768,7 +768,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.18';
+const VERSION = '9.19';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1748,6 +1748,7 @@ const INFOS = {
   restant: ['ARGENT RESTANT', "Tes revenus du mois, moins <b>toutes</b> les charges et abonnements de l'échéancier du mois (même ceux pas encore prélevés), moins tes dépenses saisies, ton épargne et ce que tu as avancé pour d'autres. C'est ce qu'il te reste pour finir le mois. Touche le chiffre pour voir à la place ton argent disponible estimé (banque + espèces)."],
   fin: ['FIN DE MOIS PRÉVUE', "C'est une <b>prévision</b> de ce qu'il te restera le dernier jour du mois.<br><br><b>Comment elle est calculée</b> : ton argent restant, moins les prélèvements et achats prévus, moins ce que tes budgets prévoient <b>pour les jours qui restent</b>. Exemple : Loisirs 100 €/mois, on est le 20 (il reste 11 jours sur 30) : l'appli prévoit encore 100 × 11/30 ≈ 37 €, pas tout ce qui reste du budget.<br><br><b>Comment elle bouge</b> : chaque jour où tu dépenses moins que ton budget, elle <b>remonte</b> un peu. Une dépense qui reste dans le rythme de ton budget ne la change pas. Une dépense au-dessus du rythme, ou un budget dépassé, la fait <b>descendre</b> tout de suite.<br><br><b>Le petit « jusqu'à »</b> en dessous : ce qu'il te resterait si tu ne dépensais plus rien dans tes budgets d'ici la fin du mois. Ta vraie fin de mois sera entre les deux.<br><br>Pour la faire remonter, regarde « Où faire des efforts » dans Mes budgets."],
   budgets: ['MES BUDGETS', "Une barre par budget : ce que tu as dépensé, ce qu'il te reste. Tampon <b>TENU</b>, <b>LIMITE</b> (près du plafond) ou <b>DÉPASSÉ</b>.<br><br><b>Le rythme</b> (budgets mensuels) : on compare ce que tu as dépensé à ce que ton budget prévoyait <b>à cette date</b>. Exemple : 100 €/mois, le 15 → prévu ≈ 50 €. Tu as dépensé 70 € : « ▲ 20 € au-dessus du rythme ». Tu as dépensé 30 € : « ▼ 20 € sous le rythme ». Le petit trait sur la barre marque aujourd'hui.<br><br><b>Où faire des efforts</b> : les budgets du mois les plus au-dessus de leur rythme, et les budgets annuels déjà dépassés sur l'année. C'est là qu'un euro économisé compte le plus.<br><br><b>Budgets annuels</b> (voyage, sorties…) : ils se dépensent par à-coups, donc on les suit sur l'année : ce qu'il reste pour l'année, la part du budget utilisée et la part de l'année écoulée. Si tu as utilisé 70 % du budget alors que 88 % de l'année est passée, tout va bien.<br><br>Les budgets « Sans alerte » (courses…) comptent dans tes prévisions mais n'ont ni rythme ni défis.<br><br>Touche un budget pour voir ses lignes et son historique."],
+  objectif: ['OBJECTIF D\'ÉPARGNE', "La jauge montre ton <b>épargne nette</b> de l'année : ce que tu as <b>versé</b> sur ton épargne (livret, PEA, assurance vie…, saisies du Journal et virements automatiques de l'Échéancier à leur date) <b>moins</b> ce que tu en as <b>retiré</b> (catégories de retrait d'épargne, par exemple « Retraits d'épargne (LEP/Livret A) »).<br><br>Exemple : 300 € versés sur le PEA et 2 661 € retirés du livret A → épargne nette <b>−2 361 €</b> : ton épargne a baissé cette année.<br><br><b>Transfert d'un compte d'épargne à un autre</b> (livret A → PEA) : saisis les <b>deux</b> mouvements, le retrait du livret et le versement sur le PEA. Ils s'annulent : ce n'est pas de l'épargne en plus, la jauge ne bouge pas.<br><br>Les <b>prêts à des proches</b> ne comptent pas : prêter n'est pas épargner.<br><br>Touche la jauge pour voir chaque mouvement compté, mois par mois."],
   prelever: ['À PRÉLEVER', "Les charges et abonnements de l'échéancier qui ne sont pas encore passés ce mois-ci, plus tes achats prévus. C'est l'argent déjà « réservé »."],
   nd: ['NON DÉPENSÉ', "Depuis janvier : revenus − dépenses. Comprend l'argent resté sur ton compte et celui parti en épargne."],
   courbe: ['SOLDE PRÉVU', "Ton argent (banque + espèces) jour par jour. Elle s'affiche pour tous les mois : un mois passé est reconstitué d'après tes saisies datées et tes prélèvements (les lignes sans date comptent le dernier jour), un mois à venir est entièrement prévu. Trait plein : calculé d'après tes saisies et tes prélèvements jusqu'à aujourd'hui (ce n'est pas ton relevé bancaire). Pointillés : la suite, si tu dépenses tes budgets au rythme prévu (seulement la part des jours qui restent : si tu dépenses moins, la fin de la courbe remonte jour après jour). Points verts : entrées de l'échéancier (salaire…). Points rouges : sorties (loyer, abonnements, virements…) et achats prévus. Une dépense dans le rythme de ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue) ; une dépense au-dessus du rythme ou un dépassement la fait descendre. Sous 0 € : découvert."] };
@@ -4191,27 +4192,37 @@ const objectifs = () => getPref('objectifs', {}) || {};
 // (9.16) Les prêts à des proches ne sont PAS de l'épargne pour l'objectif (avant, ils gonflaient la jauge),
 // et un virement automatique du mois en cours ne compte qu'une fois sa date passée.
 const estPret = n => /pr[êe]t/i.test(n || '');
+// (9.19) Retrait d'épargne : catégorie de type « Retrait », ou revenu dont le nom parle de retrait d'épargne
+// (ex. « Retraits d'épargne (LEP/Livret A) »). Les remboursements de prêts n'en sont pas.
+function estRetraitEp(n) {
+  const c = catMap()[n]; if (!c || estPret(n)) return false;
+  if (c.type === 'Retrait') return true;
+  return c.type === 'Revenu' && /retrait/i.test(n) && /([ée]pargne|livret|\bLEP\b|LDDS|PEA|assurance|PEL|CEL)/i.test(n);
+}
+function bilanEpargne(y) { const L = versementsEpargne(y), v = L.filter(x => !x.pret && !x.retrait).reduce((t, x) => t + x.v, 0), r = L.filter(x => x.retrait).reduce((t, x) => t + x.v, 0); return { verse: v, retire: r, net: v - r }; }
 function versementsEpargne(y) {
   const cm = catMap(), Y = now.getFullYear(), fin = y < Y ? 12 : y > Y ? 0 : now.getMonth() + 1, A = auj(), L = [];
   const ok = n => { const c = cm[n]; return !!c && c.type === 'Épargne' && !estAv(n); };
+  const ret = n => estRetraitEp(n); // (9.19) retraits d'épargne, même rangés en revenus
   for (let m = 1; m <= fin; m++) {
     const cours = y === Y && m === fin;
-    S.journal.forEach(e => { if (!e.deleted && e.y === y && e.m === m && e.montant && ok(e.cat) && !(cours && e.date && e.date > A)) L.push({ m, lib: e.lib || e.cat, cat: e.cat, v: e.montant, src: 'Journal', pret: estPret(e.cat) }); });
-    ((S.data && S.data.echeancier) || []).forEach(e => { if (!ok(e.cat)) return; const v = echMontant(e, y, m); if (v && !(cours && (e.jour || 1) > now.getDate())) L.push({ m, lib: e.lib || e.cat, cat: e.cat, v, src: 'Échéancier', pret: estPret(e.cat) }); });
+    S.journal.forEach(e => { if (!e.deleted && e.y === y && e.m === m && e.montant && (ok(e.cat) || ret(e.cat)) && !(cours && e.date && e.date > A)) L.push({ m, lib: e.lib || e.cat, cat: e.cat, v: e.montant, src: 'Journal', pret: estPret(e.cat), retrait: ret(e.cat) }); });
+    ((S.data && S.data.echeancier) || []).forEach(e => { if (!ok(e.cat) && !ret(e.cat)) return; const v = echMontant(e, y, m); if (v && !(cours && (e.jour || 1) > now.getDate())) L.push({ m, lib: e.lib || e.cat, cat: e.cat, v, src: 'Échéancier', pret: estPret(e.cat), retrait: ret(e.cat) }); });
   }
   return L;
 }
 function epAnnee(y, retraits) {
   if (retraits) { const Y = now.getFullYear(), fin = y < Y ? 12 : y > Y ? 0 : now.getMonth() + 1; let t = 0; for (let m = 1; m <= fin; m++) t += calc(y, m).epR; return t; }
-  return versementsEpargne(y).filter(x => !x.pret).reduce((t, x) => t + x.v, 0);
+  return bilanEpargne(y).net; // (9.19) épargne NETTE : versements − retraits d'épargne
 }
 function rendreObjDetail() {
-  const y = S.form.y, L = versementsEpargne(y), C = L.filter(x => !x.pret), P = L.filter(x => x.pret);
-  let h = enteteSheet("ÉPARGNE " + y + " · DÉTAIL", null) + `<div class="note" style="display:block;margin-top:10px">Chaque versement compté dans ta jauge, mois par mois. « Échéancier » = virement automatique (compté à sa date). Si une ligne est fausse ou en double, corrige-la dans le Journal ou dans Prévu.</div>`;
-  if (!C.length) h += `<div class="empty">Aucun versement d'épargne compté en ${y}.</div>`;
+  const y = S.form.y, L = versementsEpargne(y), C = L.filter(x => !x.pret), P = L.filter(x => x.pret), sg = x => x.retrait ? -x.v : x.v;
+  let h = enteteSheet("ÉPARGNE " + y + " · DÉTAIL", null) + `<div class="note" style="display:block;margin-top:10px">Chaque versement (+) et chaque retrait d'épargne (−) compté dans ta jauge, mois par mois. « Échéancier » = virement automatique (compté à sa date). Si une ligne est fausse ou en double, corrige-la dans le Journal ou dans Prévu.</div>`;
+  if (!C.length) h += `<div class="empty">Aucun mouvement d'épargne compté en ${y}.</div>`;
   for (let m = 1; m <= 12; m++) { const Z = C.filter(x => x.m === m); if (!Z.length) continue;
-    h += `<div class="sec"><span>${MOIS[m - 1].toUpperCase()}</span><span>${e0(Z.reduce((t, x) => t + x.v, 0))}</span></div>` + Z.map(x => `<div class="tl"><span>${esc(x.lib)}<small class="muted" style="display:block;font-size:11px">${esc(x.cat)} · ${x.src}</small></span><span>${e2(x.v)}</span></div>`).join(''); }
-  h += `<hr class="dash"><div class="tl tot"><span>TOTAL COMPTÉ</span><span>${e2(C.reduce((t, x) => t + x.v, 0))}</span></div>`;
+    const tm = Z.reduce((t, x) => t + sg(x), 0); h += `<div class="sec"><span>${MOIS[m - 1].toUpperCase()}</span><span class="${tm < 0 ? 'c-bad' : ''}">${tm < 0 ? '−' + e0(-tm) : '+' + e0(tm)}</span></div>` + Z.map(x => `<div class="tl"><span>${esc(x.lib)}<small class="muted" style="display:block;font-size:11px">${esc(x.cat)} · ${x.retrait ? 'retrait' : 'versement'} · ${x.src}</small></span><span class="${x.retrait ? 'c-bad' : ''}">${x.retrait ? '−' : '+'}${e2(x.v)}</span></div>`).join(''); }
+  const B = bilanEpargne(y);
+  h += `<hr class="dash"><div class="tl"><span>VERSÉ</span><span>+${e2(B.verse)}</span></div><div class="tl"><span>RETIRÉ</span><span>−${e2(B.retire)}</span></div><div class="tl tot"><span>ÉPARGNE NETTE</span><span class="${B.net < 0 ? 'c-bad' : ''}">${B.net < 0 ? '−' + e2(-B.net) : e2(B.net)}</span></div>`;
   if (P.length) h += `<div class="note" style="display:block;margin-top:12px">Non comptés : tes prêts à des proches (${e0(P.reduce((t, x) => t + x.v, 0))} en ${y}). Prêter n'est pas épargner : cet argent revient quand on te rembourse.</div>`;
   $('#sheetIn').innerHTML = h;
 }
@@ -4231,11 +4242,11 @@ function jaugeObjectif(f) {
 }
 function blocObjectif() {
   const y = now.getFullYear(), o = etatObjectif(y);
-  let h = `<div class="sec"><span>OBJECTIF D'ÉPARGNE ${y}</span>${o ? '<button class="lnk" data-act="obj-edit">RÉGLER</button>' : ''}</div>`;
+  let h = `<div class="sec"><span>OBJECTIF D'ÉPARGNE ${y} ${qi('objectif')}</span>${o ? '<button class="lnk" data-act="obj-edit">RÉGLER</button>' : ''}</div>`;
   if (!o) return h + `<div class="note" style="display:block;margin-top:0">Combien veux-tu mettre de côté en ${y} ? Une jauge dédiée te dira si tu es dans les temps.</div><button class="go" data-act="obj-edit" style="margin-top:8px">FIXER MON OBJECTIF</button>`;
   return h + `<div class="obj ${o.atteint ? 'win' : ''}"><button data-act="obj-detail" style="display:block;width:100%" aria-label="Voir le détail des versements">${jaugeObjectif(o.frac)}</button>
     <div class="objn"><b>${e0(o.ep)}</b><span>sur ${e0(o.cible)}</span></div>
-    <div class="note" style="display:block;text-align:center;margin:0 0 4px">Versements de janvier à aujourd'hui (livrets, PEA, assurance vie… hors prêts à des proches) · <button class="lnk" data-act="obj-detail">VOIR LE DÉTAIL ›</button>${epAnnee(y, true) > 0.5 ? ` · anciens retraits non déduits : ${e0(epAnnee(y, true))}` : ''}</div>
+    ${(() => { const B = bilanEpargne(y); return `<div class="note" style="display:block;text-align:center;margin:0 0 4px">Épargne nette depuis janvier : versé <b>${e0(B.verse)}</b> · retiré <b>${e0(B.retire)}</b> · net <b class="${B.net < 0 ? 'c-bad' : ''}">${B.net < 0 ? '−' + e0(-B.net) : e0(B.net)}</b>${B.net < 0 ? '<br>Tu as plus retiré que versé cette année.' : ''} · <button class="lnk" data-act="obj-detail">VOIR LE DÉTAIL ›</button></div>`; })()}
     <div class="note" style="display:block;text-align:center;margin-top:4px">${o.atteint ? '🎉 Objectif atteint, bravo !' : `${o.ecart >= 0 ? `<b class="c-ok">En avance de ${e0(o.ecart)}</b>` : `<b class="c-bad">En retard de ${e0(-o.ecart)}</b>`} sur le rythme prévu · encore <b>${e0(o.parMois)}/mois</b> d'ici décembre`}${o.proj != null && !o.atteint ? `<br>À ce rythme, tu finis l'année à <b>${e0(o.proj)}</b>` : ''}</div></div>`;
 }
 function rendreObjEdit() {
@@ -4243,7 +4254,7 @@ function rendreObjEdit() {
   let t = 0, n = 0; for (let k = 1; k <= 6; k++) { let yy = now.getFullYear(), mm = now.getMonth() + 1 - k; while (mm < 1) { mm += 12; yy--; } if (moisActif(yy, mm)) { t += calc(yy, mm).ep; n++; } }
   const sug = n ? Math.max(100, Math.round(t / n * 12 / 100) * 100) : 0;
   $('#sheetIn').innerHTML = enteteSheet("OBJECTIF D'ÉPARGNE " + f.y, null) + `
-    <div class="note" style="display:block;margin-top:10px">Tout ce qui part sur l'épargne dans l'année compte (Échéancier compris, à sa date), sauf les prêts à des proches. Les retraits ne sont pas déduits.</div>
+    <div class="note" style="display:block;margin-top:10px">La jauge compte ton épargne nette : versements de l'année (Échéancier compris, à sa date) moins tes retraits d'épargne. Les prêts à des proches ne comptent pas.</div>
     <input class="libin" data-f="montant" inputmode="decimal" placeholder="Montant pour l'année en €" value="${esc(f.montant)}" style="margin-top:12px">
     ${sug ? `<button class="chip sug" data-act="obj-sug" data-v="${sug}">Suggestion : ${e0(sug)} (ton rythme des 6 derniers mois)</button>` : ''}
     <div class="err" id="ferr"></div><button class="go" data-act="obj-ok">ENREGISTRER</button>
