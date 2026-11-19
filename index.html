@@ -769,7 +769,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.30';
+const VERSION = '9.31';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1215,7 +1215,7 @@ function exclusSerie() {
 // (9.30) Casse un jour sans dépense : une dépense courante, OU une charge fixe (Abonnements, Assurances…) saisie à la main
 // dans le Journal (l'Échéancier n'est jamais dans le Journal, donc les prélèvements automatiques ne cassent rien).
 // Les lignes « Écart … » (correction d'un montant de l'Échéancier) ne cassent rien. Les catégories cochées non plus.
-function estFixeManuelle(cat, lib) { const c = catMap()[cat]; return !!c && c.type === 'Dépense' && FIX.includes(c.groupe) && !estAv(cat) && !/^Écart/.test(String(lib || '').trim()); }
+function estFixeManuelle(cat, lib) { const c = catMap()[cat]; return !!c && c.type === 'Dépense' && FIX.includes(c.groupe) && !estAv(cat) && !/^[ée]carts?\b/i.test(String(lib || '').trim()); } // « Écart », « écart », « Ecart », « ecart »… (9.31)
 function casseSerie(cat, ex, lib) { return (estCourante(cat) || estFixeManuelle(cat, lib)) && !(ex || exclusSerie()).includes(cat); }
 // Jours complets sans dépense courante (aujourd'hui n'est compté qu'une fois fini). Date de saisie = colonne « Saisi le » du Journal.
 function joursSansDepense() {
