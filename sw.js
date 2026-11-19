@@ -1,6 +1,6 @@
 // Chaque appli ne nettoie que SES anciens caches : les 3 applis partagent la même adresse GitHub.
 const PREFIXE = 'jauge-devlin-v';
-const CACHE = PREFIXE + '70';
+const CACHE = PREFIXE + '71';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 // (9.27) Installation : on va chercher les fichiers frais sur le serveur (pas une copie du navigateur vieille de quelques minutes)
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' }))))); self.skipWaiting(); });
@@ -9,12 +9,13 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 // Ouvre instantanément depuis le cache, puis met à jour en arrière-plan.
+// Hors ligne, la page d'accueil ne sert de repli qu'à l'ouverture d'une page (pas à une icône ou au manifeste).
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;
   e.respondWith(caches.open(CACHE).then(async c => {
     const hit = await c.match(e.request, { ignoreSearch: true });
-    const net = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => hit);
+    const net = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => hit || (e.request.mode === 'navigate' ? caches.match('./index.html') : Response.error()));
     return hit || net;
   }));
 });

@@ -1,5 +1,5 @@
 /**
- * BUDGET · API du budget de Devlin (Apps Script) · v5.13
+ * BUDGET · API du budget de Devlin (Apps Script) · v5.14
  * ------------------------------------------
  * Ce script est relié au fichier budget dans lequel il a été créé.
  * Il lit les Paramètres, l'Échéancier et le Journal, et écrit dans le Journal.
@@ -11,6 +11,11 @@
  * v5.2 : la date de la dépense (colonne « Saisi le ») se modifie aussi quand on corrige une ligne.
  * v5.3 : fonction verifier() pour donner les autorisations et tester le script en un clic.
  * v5.6 : « À venir » : le mois est écrit en texte (corrige l'échec des éléments à venir).
+ * v5.14 : envois rejoués sans risque après une coupure : chaque ajout, suppression, ligne d'Échéancier ou d'« À venir »
+ *         porte un identifiant (uid) gardé 30 jours (propriété UIDS, plus seulement 6 h) ; une suppression déjà faite
+ *         n'efface plus une 2e ligne identique ; une modification déjà faite répond « ok » ; libellé écrit en texte
+ *         (cellule au format « Texte brut » : « =… », « 1,20 », « 12/11 » ne sont plus transformés par Sheets) ;
+ *         la mémoire UIDS n'est écrite qu'une fois par demande (un lot de 20 envois = 1 écriture).
  * v5.13 : une fois, les catégories « Courses » passent en suivi « Sans alerte ».
  * v5.12 : préférence « envies » (liste d'envies) ; colonne « Payé en » accepte aussi « En ligne ».
  * v5.11 : action « lot » : plusieurs envois en une demande (un seul verrou) ; un envoi refusé n'empêche pas les suivants.
@@ -32,7 +37,7 @@
  */
 
 const CLE_A_ENREGISTRER = 'CHANGE-MOI';
-const VERSION_API = '5.13';
+const VERSION_API = '5.14';
 
 // Laisse vide si le script est ouvert depuis le fichier (Extensions > Apps Script).
 const ID_FICHIER = '1TFXRVMLuVv_NauUH7VyJ4Pgd-Us5JuD3_3lzN_ojfvQ'; // fichier budget de Devlin
@@ -109,8 +114,8 @@ function traiter_(req) {
 const ECRITURES_ = {
   'add': r => ajouter_(r.ligne),
   'update': r => modifier_(r.row, r.attendu, r.ligne),
-  'delete': r => supprimer_(r.row, r.attendu),
-  'ech-save': r => echEnregistrer_(r.row, r.attendu, r.e),
+  'delete': r => supprimer_(r.row, r.attendu, r.uid),
+  'ech-save': r => echEnregistrer_(r.row, r.attendu, r.e, r.uid),
   'ech-del': r => echSupprimer_(r.row, r.attendu),
   'budget': r => budget_(r.nom, r.budget, r.suivi),
   'cat-add': r => catAjouter_(r.nom, r.groupe, r.budget, r.suivi),
@@ -118,7 +123,7 @@ const ECRITURES_ = {
   'cat-del': r => catRetirer_(r.nom, r.cible),
   'solde-ctrl': r => soldeControle_(r.mois, r.solde, r.especes),
   'solde-dep': r => soldeDepart_(r.annee, r.valeur),
-  'av-save': r => avEnregistrer_(r.row, r.attendu, r.a),
+  'av-save': r => avEnregistrer_(r.row, r.attendu, r.a, r.uid),
   'av-del': r => avSupprimer_(r.row, r.attendu),
   'defi': r => defi_(r.mois, r.cat, r.montant),
   'pref-set': r => prefSet_(r.cle, r.valeur),
@@ -378,11 +383,53 @@ function defi_(mois, cat, montant) {
 
 /* ---------- Écriture ---------- */
 
+// v5.14 · Mémoire durable des envois déjà faits (uid → ligne), pour qu'un envoi rejoué après une coupure
+// (le fichier a écrit, la réponse s'est perdue) ne soit pas appliqué deux fois, même le lendemain.
+// Propriété « UIDS » : { "type:uid": [ligne, decale(0/1), jour] }, 30 jours et ~8 000 caractères au plus (les plus anciens partent).
+// Toujours lue et écrite sous le verrou (avecVerrou_) : retenue en mémoire pendant la demande, écrite une fois à la fin.
+const UIDS_JOURS = 30, UIDS_MAX = 8000;
+let UIDS_ = null, UIDS_SALE_ = false;
+function uidsLire_() {
+  if (UIDS_) return UIDS_;
+  try { UIDS_ = JSON.parse(PropertiesService.getScriptProperties().getProperty('UIDS') || '{}') || {}; } catch (e) { UIDS_ = {}; }
+  return UIDS_;
+}
+function cleUid_(type, uid) { return uid ? type + ':' + String(uid).slice(0, 40) : null; }
+function uidVu_(cle) { return cle ? uidsLire_()[cle] || null : null; }
+function uidRetenir_(cle, row, decale) {
+  if (!cle) return;
+  const m = uidsLire_(), j = Math.floor(Date.now() / 86400000);
+  m[cle] = [row || 0, decale ? 1 : 0, j];
+  UIDS_SALE_ = true; // écrit une seule fois, à la fin de la demande (uidsEcrire_, sous le verrou), même pour un lot de 20 envois
+}
+function uidsEcrire_() {
+  if (!UIDS_SALE_ || !UIDS_) return;
+  UIDS_SALE_ = false;
+  const m = UIDS_, j = Math.floor(Date.now() / 86400000);
+  let cles = Object.keys(m).filter(k => !(Array.isArray(m[k]) && j - m[k][2] <= UIDS_JOURS));
+  cles.forEach(k => delete m[k]);
+  let t = JSON.stringify(m);
+  if (t.length > UIDS_MAX) {
+    cles = Object.keys(m).sort((a, b) => m[a][2] - m[b][2]);
+    while (t.length > UIDS_MAX && cles.length > 1) { delete m[cles.shift()]; t = JSON.stringify(m); }
+  }
+  PropertiesService.getScriptProperties().setProperty('UIDS', t);
+}
+
+// v5.14 · Libellé écrit en texte : sinon Sheets transforme « =x », « +3 », « 1,20 », « 12/11 », « VRAI »…
+// en formule, nombre ou date, et la ligne ne se reconnaît plus ensuite (« La ligne a changé »).
+// La cellule du libellé passe au format « Texte brut » AVANT d'écrire, puis le texte est écrit tel quel
+// (pas d'apostrophe devant : dans une cellule déjà en texte brut, elle resterait collée au libellé).
+function libEnTexte_(sh, row, col) { sh.getRange(row, col).setNumberFormat('@'); }
+
 function avecVerrou_(fn) {
   const lock = LockService.getScriptLock();
   // Fichier occupé par un autre envoi : on le dit à l'appli, qui réessaiera toute seule (rien n'est perdu).
   if (!lock.tryLock(20000)) return { ok: false, error: 'OCCUPE', message: 'Fichier occupé, nouvel essai automatique.' };
-  try { return fn(); } finally { lock.releaseLock(); }
+  try { return fn(); } finally {
+    try { uidsEcrire_(); } catch (err) { console.error('UIDS non enregistrés : ' + (err && err.message || err)); }
+    lock.releaseLock();
+  }
 }
 
 function valider_(l, futurOk) {
@@ -411,9 +458,12 @@ function ajouter_(l) {
   const err = valider_(l);
   if (err) return { ok: false, error: 'INVALIDE', message: err };
   // Anti-doublon : si le téléphone renvoie un ajout déjà écrit (réseau coupé avant la réponse), on ne l'écrit pas deux fois.
-  const cache = CacheService.getScriptCache(), cleUid = l.uid ? 'add_' + String(l.uid).slice(0, 40) : null;
-  if (cleUid && cache.get(cleUid)) return { ok: true, row: Number(cache.get(cleUid)), deja: true };
+  // v5.14 : mémoire durable (UIDS, 30 jours) ; l'ancienne mémoire de 6 h (CacheService) reste lue pour les envois d'avant.
   const jou = classeur_().getSheetByName('Journal');
+  const cleUid = cleUid_('add', l.uid), vu = uidVu_(cleUid);
+  let ancien = null;
+  if (!vu && l.uid) { try { ancien = CacheService.getScriptCache().get('add_' + String(l.uid).slice(0, 40)); } catch (e) {} }
+  if (vu || ancien) return { ok: true, row: ligneRetrouvee_(jou, vu ? vu[0] : Number(ancien), l), deja: true };
   const vals = jou.getRange(5, 1, nbLignesJournal_(jou), 4).getValues();
   let dernier = -1;
   for (let i = vals.length - 1; i >= 0; i--) {
@@ -421,26 +471,45 @@ function ajouter_(l) {
   }
   const row = 5 + dernier + 1;
   if (row > jou.getMaxRows()) jou.insertRowsAfter(jou.getMaxRows(), 100);
-  jou.getRange(row, 1, 1, 4).setValues([[l.mois, l.lib || l.cat, l.cat, Math.round(Number(l.montant) * 100) / 100]]);
+  libEnTexte_(jou, row, 2);
+  jou.getRange(row, 1, 1, 4).setValues([[l.mois, String(l.lib || l.cat), l.cat, Math.round(Number(l.montant) * 100) / 100]]);
   ecrireDate_(jou, row, l.date);
   ecrirePaye_(jou, row, l.especes === true, l.enLigne === true);
-  if (cleUid) cache.put(cleUid, String(row), 21600); // mémorisé 6 h
+  uidRetenir_(cleUid, row, false);
   return { ok: true, row };
+}
+
+// Un ajout déjà fait : sa ligne a pu remonter depuis (suppressions au-dessus). On cherche la ligne identique
+// la plus proche, à son numéro ou au-dessus ; introuvable (supprimée ou changée entre-temps) : null, l'appli relira le fichier.
+function ligneRetrouvee_(jou, row, l) {
+  row = Number(row) || 0;
+  const n = Math.min(row, jou.getMaxRows()) - 4;
+  if (n < 1) return null;
+  const vals = jou.getRange(5, 1, n, 4).getValues();
+  for (let i = n - 1; i >= 0; i--) if (identique_(vals[i], l)) return 5 + i;
+  return null;
 }
 
 function modifier_(row, attendu, l) {
   const err = valider_(l);
   if (err) return { ok: false, error: 'INVALIDE', message: err };
   const jou = classeur_().getSheetByName('Journal');
-  const r = jou.getRange(row, 1, 1, 4);
-  if (!identique_(r.getValues()[0], attendu)) return { ok: false, error: 'CHANGE', message: 'La ligne a changé dans le fichier.', detail: { row, fichier: r.getValues()[0].map(String), attendu } };
-  r.setValues([[l.mois, l.lib || l.cat, l.cat, Math.round(Number(l.montant) * 100) / 100]]);
+  if (!(Number(row) >= 5)) return { ok: false, error: 'INVALIDE', message: 'Ligne inconnue.' };
+  const r = jou.getRange(row, 1, 1, 4), v = r.getValues()[0];
+  // v5.14 : une modification déjà faite (renvoyée après une coupure) n'est plus refusée : on la réécrit à l'identique.
+  if (!identique_(v, attendu) && !identique_(v, Object.assign({}, l, { lib: l.lib || l.cat }))) return { ok: false, error: 'CHANGE', message: 'La ligne a changé dans le fichier.', detail: { row, fichier: v.map(String), attendu } };
+  libEnTexte_(jou, row, 2);
+  r.setValues([[l.mois, String(l.lib || l.cat), l.cat, Math.round(Number(l.montant) * 100) / 100]]);
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(l.date || ''))) ecrireDate_(jou, row, l.date); // date de la dépense corrigée dans l'appli
   majPaye_(jou, row, l); // une ancienne appli qui n'envoie rien ne touche pas à la colonne
   return { ok: true, row };
 }
 
-function supprimer_(row, attendu) {
+function supprimer_(row, attendu, uid) {
+  // v5.14 : suppression déjà faite (renvoyée après une coupure) : on ne supprime pas la ligne suivante identique.
+  const cleUid = cleUid_('del', uid), vu = uidVu_(cleUid);
+  if (vu) return { ok: true, row: vu[0], decale: vu[1] === 1, deja: true };
+  if (!(Number(row) >= 5)) return { ok: false, error: 'INVALIDE', message: 'Ligne inconnue.' };
   const jou = classeur_().getSheetByName('Journal');
   const r = jou.getRange(row, 1, 1, 4);
   if (!identique_(r.getValues()[0], attendu)) return { ok: false, error: 'CHANGE', message: 'La ligne a changé dans le fichier.', detail: { row, fichier: r.getValues()[0].map(String), attendu } };
@@ -449,6 +518,7 @@ function supprimer_(row, attendu) {
     if (jou.getMaxColumns() >= COL_DATE) jou.getRange(row, COL_DATE).clearContent();
     const cp = colPaye_(jou, false); if (cp) jou.getRange(row, cp).clearContent();
   }
+  uidRetenir_(cleUid, row, row > 5);
   return { ok: true, row, decale: row > 5 };
 }
 
@@ -461,7 +531,7 @@ function echIdentique_(v, a) {
     Math.abs(Number(v[2]) - Number(a.montant)) < 0.005;
 }
 
-function echEnregistrer_(row, attendu, e) {
+function echEnregistrer_(row, attendu, e, uid) {
   const ss = classeur_(), ech = ss.getSheetByName('Échéancier');
   const cats = ss.getSheetByName('Paramètres').getRange('A10:A40').getValues().map(r => String(r[0]).trim());
   if (!e || !String(e.lib || '').trim()) return { ok: false, error: 'INVALIDE', message: 'Libellé manquant.' };
@@ -473,6 +543,9 @@ function echEnregistrer_(row, attendu, e) {
   const ligne = [String(e.lib).trim(), e.cat, Math.round(Number(e.montant) * 100) / 100, e.freq,
     e.jour ? Math.min(31, Math.max(1, Math.round(Number(e.jour)))) : '',
     mois(e.f) || 1, mois(e.g) || 12, an(e.h), an(e.i), e.pause ? true : ''];
+  // v5.14 : nouvelle ligne renvoyée après une coupure (déjà écrite) : on renvoie sa ligne au lieu d'en créer une 2e.
+  const cleUid = row ? null : cleUid_('ech', uid), vu = uidVu_(cleUid);
+  if (vu) return { ok: true, row: vu[0], deja: true };
   if (!row) {
     const a = ech.getRange(5, 1, finEch_(ech) - 4, 1).getValues();
     let i = a.findIndex(r => String(r[0]).trim() === '');
@@ -480,16 +553,21 @@ function echEnregistrer_(row, attendu, e) {
     row = 5 + i;
   } else {
     if (row < 5 || row > finEch_(ech)) return { ok: false, error: 'INVALIDE', message: 'Ligne hors Échéancier.' };
-    if (!echIdentique_(ech.getRange(row, 1, 1, 3).getValues()[0], attendu)) return { ok: false, error: 'CHANGE', message: "La ligne a changé dans l'Échéancier." };
+    const v = ech.getRange(row, 1, 1, 3).getValues()[0];
+    if (!echIdentique_(v, attendu) && !echIdentique_(v, { lib: String(e.lib).trim(), cat: e.cat, montant: e.montant })) return { ok: false, error: 'CHANGE', message: "La ligne a changé dans l'Échéancier." };
   }
+  libEnTexte_(ech, row, 1);
   ech.getRange(row, 1, 1, 10).setValues([ligne]);
+  uidRetenir_(cleUid, row, false);
   return { ok: true, row };
 }
 
 function echSupprimer_(row, attendu) {
   const ech = classeur_().getSheetByName('Échéancier');
   if (row < 5 || row > finEch_(ech)) return { ok: false, error: 'INVALIDE', message: 'Ligne hors Échéancier.' };
-  if (!echIdentique_(ech.getRange(row, 1, 1, 3).getValues()[0], attendu)) return { ok: false, error: 'CHANGE', message: "La ligne a changé dans l'Échéancier." };
+  const v = ech.getRange(row, 1, 1, 3).getValues()[0];
+  if (v.every(x => String(x).trim() === '')) return { ok: true, row, deja: true }; // v5.14 : déjà supprimée (envoi renvoyé)
+  if (!echIdentique_(v, attendu)) return { ok: false, error: 'CHANGE', message: "La ligne a changé dans l'Échéancier." };
   ech.getRange(row, 1, 1, 10).clearContent();
   return { ok: true, row };
 }
@@ -604,34 +682,41 @@ function avIdentique_(v, a) {
   return a && String(v[1]).trim() === String(a.lib) && String(v[2]).trim() === String(a.cat) && Math.abs(Number(v[3]) - Number(a.montant)) < 0.005;
 }
 
-function avEnregistrer_(row, attendu, a) {
+function avEnregistrer_(row, attendu, a, uid) {
   const ss = classeur_(), sh = ss.getSheetByName('À venir');
   if (!sh) return { ok: false, error: 'INVALIDE', message: 'Feuille « À venir » introuvable.' };
   const err = valider_({ mois: a.mois, lib: a.lib, cat: a.cat, montant: a.montant }, true);
   if (err) return { ok: false, error: 'INVALIDE', message: err };
+  // v5.14 : achat prévu renvoyé après une coupure (déjà écrit) : pas de 2e ligne.
+  const cleUid = row ? null : cleUid_('av', uid), vu = uidVu_(cleUid);
+  if (vu) return { ok: true, row: vu[0], deja: true };
   if (!row) {
     const v = sh.getRange(4, 1, finAv_(sh) - 3, 4).getValues();
     const i = v.findIndex(r => String(r[1]).trim() === '' && r[3] === '');
     if (i < 0) return { ok: false, error: 'PLEIN', message: 'La feuille « À venir » est pleine.' };
     row = 4 + i;
-  } else if (!avIdentique_(sh.getRange(row, 1, 1, 4).getValues()[0], attendu)) {
+  } else if (!avIdentique_(sh.getRange(row, 1, 1, 4).getValues()[0], attendu) && !avIdentique_(sh.getRange(row, 1, 1, 4).getValues()[0], { lib: String(a.lib).trim(), cat: a.cat, montant: a.montant })) {
     return { ok: false, error: 'CHANGE', message: 'La ligne a changé dans « À venir ».' };
   }
   // Écrit cellule par cellule : en cas de souci (validation, format…), le message dit laquelle.
   const vals = [a.mois, String(a.lib).trim(), a.cat, Math.round(Number(a.montant) * 100) / 100];
   // Le mois est forcé en texte : sinon Sheets transforme « Novembre 2026 » en date et le menu le refuse.
   sh.getRange(row, 1).setNumberFormat('@');
+  libEnTexte_(sh, row, 2);
   ['Mois', 'Libellé', 'Catégorie', 'Montant'].forEach((nom, k) => {
     try { sh.getRange(row, k + 1).setValue(vals[k]); } catch (err) { throw new Error('« À venir », colonne ' + nom + ' : ' + err.message); }
   });
   sh.getRange(row, 5).setValue(false);
   sh.getRange(row, 6).setValue(a.jour ? Math.round(Number(a.jour)) : '');
+  uidRetenir_(cleUid, row, false);
   return { ok: true, row };
 }
 
 function avSupprimer_(row, attendu) {
   const sh = classeur_().getSheetByName('À venir');
-  if (!avIdentique_(sh.getRange(row, 1, 1, 4).getValues()[0], attendu)) return { ok: false, error: 'CHANGE', message: 'La ligne a changé dans « À venir ».' };
+  const v = sh.getRange(row, 1, 1, 4).getValues()[0];
+  if (String(v[1]).trim() === '' && v[3] === '') return { ok: true, deja: true }; // v5.14 : déjà supprimé (envoi renvoyé)
+  if (!avIdentique_(v, attendu)) return { ok: false, error: 'CHANGE', message: 'La ligne a changé dans « À venir ».' };
   sh.getRange(row, 1, 1, 4).clearContent(); sh.getRange(row, 6).clearContent(); sh.getRange(row, 5).setValue(false);
   return { ok: true };
 }
