@@ -769,7 +769,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.31';
+const VERSION = '9.32';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -2049,7 +2049,7 @@ function sectionsModeEmploi() {
       ['🧺', 'LES DÉPENSES ESSENTIELLES', "Les catégories « Sans alerte » (les courses par exemple) ne servent jamais de défi : on ne se prive pas de manger pour gagner des points."]]],
     ['reglages', '⚙', 'RÉGLAGES UTILES', 'Adapter l\'appli à ta façon de faire.', [
       ['?', 'AIDES ET EXPLICATIONS', "Masque les « ? », et l'aide de la saisie quand tu n'en as plus besoin. Ce mode d'emploi reste toujours dans Réglages."],
-      ['🧺', 'CATÉGORIES QUI NE CASSENT PAS LES SÉRIES', "Réglages › Mon budget (ou Stats › Progrès › Défis, tout en bas) : coche par exemple Courses si faire les courses ne doit pas casser un jour sans dépense. Les montants comptent toujours dans tes budgets."],
+      ['🧺', 'CATÉGORIES QUI NE CASSENT PAS LES SÉRIES', "Réglages › Mon budget (ou Stats › Progrès › Défis, tout en bas) : coche par exemple Courses si faire les courses ne doit pas casser un jour sans dépense. Les montants comptent toujours dans tes budgets.<br><br><b>Ce qui casse une journée</b> : une dépense courante (courses, sorties, divers…) ou une charge fixe <b>saisie à la main</b> (un abonnement pris en plus, par exemple). <b>Ce qui ne la casse jamais</b> : les prélèvements automatiques de l'Échéancier, les lignes « Écart … », les revenus, l'épargne, les catégories cochées ici. Une journée n'est comptée qu'une fois terminée (le lendemain)."],
       ['📅', 'CHAQUE MOIS', "En haut des Réglages : le contrôle du solde (✓ quand il est fait pour le mois), le retrait d'espèces et les budgets par catégorie."],
       ['⏱', 'TAUX HORAIRE', "Dans Achats plaisir : calculé tout seul (salaire moyen des 3 derniers mois ÷ tes heures de contrat). Tu peux changer les heures par semaine ou saisir un taux à la main."],
       ['◀', 'BOUTON RETOUR', "Le retour du téléphone ferme la fenêtre ouverte, puis revient à l'accueil. Il ne fait jamais sortir de l'appli : pour la quitter, utilise le bouton ou le geste « accueil » du téléphone."],
@@ -3360,7 +3360,7 @@ function rendreXpInfo() {
     ['🍂 SAISONS (UNE FOIS PAR AN CHACUNE)', [['🍂', 'Novembre sobre', 150], ['🎄', "Calendrier de l'avent", 250], ...SAISONS_EV.map(d => ['🎟️', d.nom, d.xp]), ['🏁', "Objectif d'épargne annuel", 200]]],
     ['🏆 SUCCÈS (UNE FOIS CHACUN)', [['🥉', 'Facile', 20], ['🥈', 'Moyen', 50], ['🥇', 'Difficile', 120], ['💎', 'Extrême', 300]]]];
   $('#sheetIn').innerHTML = enteteSheet("COMMENT GAGNER DE L'XP", null) + G.map(([t, L]) => `<div class="grp" style="margin-top:14px">${t}</div><div class="ticket">${L.map(r => `<div class="tl"><span>${r[0]} ${esc(r[1])}</span><span class="c-ok">+${r[2]}</span></div>`).join('')}</div>`).join('')
-    + `<div class="note" style="display:block;margin-top:14px">Ne rapportent rien par eux-mêmes : saisir un revenu, un retrait d'épargne ou un versement. Tout est compté depuis le 1er novembre 2026, et recalculé si tu corriges une ligne (l'XP peut donc aussi baisser).</div>
+    + `<div class="note" style="display:block;margin-top:14px">Ne rapportent rien par eux-mêmes : saisir un revenu, un retrait d'épargne ou un versement. Jour sans dépense : compté le lendemain ; seuls une dépense courante ou une charge fixe saisie à la main le cassent (pas l'Échéancier, ni les lignes « Écart »). Tout est compté depuis le 1er novembre 2026, et recalculé si tu corriges une ligne (l'XP peut donc aussi baisser).</div>
     <button class="go" data-act="xpjournal" style="margin-top:12px">📜 VOIR MON JOURNAL D'XP</button>`;
 }
 function rendreXpLog() { $('#sheetIn').innerHTML = enteteSheet("JOURNAL D'XP", null) + `<div class="xpcompact">${blocDetailXP(etatJeu())}</div>`; }
