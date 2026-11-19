@@ -771,7 +771,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.34';
+const VERSION = '9.35';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -2246,9 +2246,7 @@ function rendreForm() {
 // d'autres » ni « Toutes ▾ » ouverts) et un espace vide avant le libellé comble la différence. Clavier ouvert : espace masqué.
 function hauteurSaisie() {
   const f = S.form, z = $('#sheetIn .fsai'), sp = $('#fsp'); if (!f || !z || !sp || z.classList.contains('kb')) return;
-  sp.style.height = '0px'; const h = z.offsetHeight; if (!h) return;
-  if (!f.partage && !f.all) f.hRef = Math.max(f.hRef || 0, h);
-  if (f.hRef > h) sp.style.height = (f.hRef - h) + 'px';
+  sp.style.height = '0px'; // 9.35 (Théo) : plus d'espace vide sous les catégories ; la fiche rétrécit (pavé et ENREGISTRER restent en bas)
 }
 // Clavier du téléphone ouvert (libellé, prénom, part) : la fiche se resserre pour garder à l'écran montant, catégories,
 // libellé, date et ENREGISTRER (≈ 390 × 450 utiles) : on masque le pavé numérique, le type et le mois le temps de la frappe.
