@@ -772,7 +772,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.38';
+const VERSION = '9.39';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1808,6 +1808,7 @@ function graduations(mn, mx) {
 }
 // (9.18) Courbe du solde pour n'importe quel mois : en cours (calculé puis prévu), passé (reconstitué jour par jour
 // d'après les saisies datées et l'Échéancier ; les lignes sans date comptent le dernier jour), à venir (tout prévu).
+const COURBE_DEPUIS = 2026 * 12 + 11; // 9.38 (Théo) : courbes des mois terminés à partir de novembre 2026
 function courbeSoldeMois(y, m) {
   const st = statut(y, m);
   // 9.38 (Théo) : courbe du mois en cours limitée à ce mois ; la suite (jusqu'à la fin du mois suivant) sert seulement à l'alerte de découvert.
@@ -1821,9 +1822,8 @@ function courbeSoldeMois(y, m) {
     const Q = P.filter(p => p.y === y && p.m === m); return { texte: true, fin: Q.length ? Q[Q.length - 1].s : null };
   }
   const E = soldeCalcule(y, m); if (E == null) return null;
-  // Mois passé : courbe seulement si ses lignes ont une date de jour (anciennes données sans date : chemin inconnu)
-  const LM = S.journal.filter(e => !e.deleted && e.y === y && e.m === m && e.montant);
-  if (LM.length && LM.filter(e => e.date).length < 0.9 * LM.length) return { texte: true, fin: E, passe: true };
+  // Mois passé : courbe seulement à partir de novembre 2026 pour tout le monde (avant : anciennes données, chemin inconnu)
+  if (y * 12 + m < COURBE_DEPUIS) return { texte: true, fin: E, passe: true };
   const nbj = dim(y, m), cm = catMap(), oc = occurrences(y, m), iso = j => y + '-' + String(m).padStart(2, '0') + '-' + String(j).padStart(2, '0');
   let s = E - calc(y, m).restant; const P = [];
   for (let j = 1; j <= nbj; j++) {
@@ -1890,7 +1890,7 @@ const INFOS = {
   objectif: ['OBJECTIF D\'ÉPARGNE', "La jauge montre ton <b>épargne nette</b> de l'année : ce que tu as <b>versé</b> sur ton épargne (livret, PEA, assurance vie…, saisies du Journal et virements automatiques de l'Échéancier à leur date) <b>moins</b> ce que tu en as <b>retiré</b> (catégories de retrait d'épargne, par exemple « Retraits d'épargne (LEP/Livret A) »).<br><br>Exemple : 300 € versés sur le PEA et 2 661 € retirés du livret A → épargne nette <b>−2 361 €</b> : ton épargne a baissé cette année.<br><br><b>Transfert d'un compte d'épargne à un autre</b> (livret A → PEA) : saisis les <b>deux</b> mouvements, le retrait du livret et le versement sur le PEA. Ils s'annulent : ce n'est pas de l'épargne en plus, la jauge ne bouge pas.<br><br>Les <b>prêts à des proches</b> ne comptent pas : prêter n'est pas épargner. Pour prêter, utilise DÉPENSE › « 👥 Payé pour d'autres » avec ta part à 0 € : l'appli note qu'on te doit cette somme.<br><br><b>Comment saisir</b> : + › ÉPARGNE › « ↓ Mettre de côté » pour un versement, « ↑ Retirer de l'épargne » pour un retrait.<br><br>Touche la jauge pour voir chaque mouvement compté, mois par mois."],
   prelever: ['À PRÉLEVER', "Les charges et abonnements de l'échéancier qui ne sont pas encore passés ce mois-ci, plus tes achats prévus. C'est l'argent déjà « réservé »."],
   nd: ['NON DÉPENSÉ', "Depuis janvier : revenus − dépenses. Comprend l'argent resté sur ton compte et celui parti en épargne."],
-  courbe: ['TON COMPTE JOUR PAR JOUR', "<b>Ce que montre la courbe</b> : ton argent (banque + espèces) jour par jour, sur le mois affiché seulement, donc un peu plus que le chiffre « sur tes comptes » de l'accueil si tu as du liquide. Trait plein : calculé d'après tes saisies et tes prélèvements jusqu'à aujourd'hui (ce n'est pas ton relevé bancaire). Pointillés : la suite, si tu dépenses tes budgets au rythme prévu (seulement la part des jours qui restent). Sous 0 € : découvert.<br><br><b>Ce n'est pas le bilan du mois</b> : la courbe part de ce que tu as sur ton compte ; le bilan ne compte que ce que le mois rapporte ou coûte. Exemple : 672 € fin octobre et un bilan de −528 € → environ 144 € fin novembre.<br><br><b>Mois terminés</b> : la courbe reste visible si tes lignes ont une date de jour ; sinon (anciennes données) seul le solde de fin de mois est indiqué. <b>Mois à venir</b> : seulement le solde prévu en fin de mois. <b>Alerte</b> : si ton compte risque de passer sous 0 € d'ici la fin du mois suivant, un bandeau te prévient.<br><br><b>Les points</b> : <b>verts</b> = entrées de l'échéancier (salaire…) ; <b>rouges</b> = sorties (loyer, abonnements, virements…) et achats prévus.<br><br><b>Comment elle bouge</b> : une dépense dans le rythme de ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue). Une dépense au-dessus du rythme, ou un dépassement, la fait <b>descendre</b>. Si tu dépenses moins que prévu, la fin de la courbe <b>remonte</b> jour après jour."] };
+  courbe: ['TON COMPTE JOUR PAR JOUR', "<b>Ce que montre la courbe</b> : ton argent (banque + espèces) jour par jour, sur le mois affiché seulement, donc un peu plus que le chiffre « sur tes comptes » de l'accueil si tu as du liquide. Trait plein : calculé d'après tes saisies et tes prélèvements jusqu'à aujourd'hui (ce n'est pas ton relevé bancaire). Pointillés : la suite, si tu dépenses tes budgets au rythme prévu (seulement la part des jours qui restent). Sous 0 € : découvert.<br><br><b>Ce n'est pas le bilan du mois</b> : la courbe part de ce que tu as sur ton compte ; le bilan ne compte que ce que le mois rapporte ou coûte. Exemple : 672 € fin octobre et un bilan de −528 € → environ 144 € fin novembre.<br><br><b>Mois terminés</b> : la courbe reste visible à partir de novembre 2026 ; avant (anciennes données), seul le solde de fin de mois est indiqué. <b>Mois à venir</b> : seulement le solde prévu en fin de mois. <b>Alerte</b> : si ton compte risque de passer sous 0 € d'ici la fin du mois suivant, un bandeau te prévient.<br><br><b>Les points</b> : <b>verts</b> = entrées de l'échéancier (salaire…) ; <b>rouges</b> = sorties (loyer, abonnements, virements…) et achats prévus.<br><br><b>Comment elle bouge</b> : une dépense dans le rythme de ton budget ne fait pas bouger la fin de la courbe (elle était déjà prévue). Une dépense au-dessus du rythme, ou un dépassement, la fait <b>descendre</b>. Si tu dépenses moins que prévu, la fin de la courbe <b>remonte</b> jour après jour."] };
 const qi = k => LS.get('aidesOff', false) ? '' : `<span class="qi" data-act="info" data-k="${k}" role="button" aria-label="Explication">?</span>`;
 // Détail des écritures pas encore envoyées au fichier, avec la dernière erreur
 function descOp(o) {
