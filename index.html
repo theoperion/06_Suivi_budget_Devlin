@@ -772,7 +772,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.40';
+const VERSION = '9.41';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -2150,7 +2150,7 @@ function sectionsModeEmploi() {
       ['🔁', "L'ÉCHÉANCIER", "Loyer, abonnements, salaire, virement d'épargne automatique : saisis-les <b>une fois</b>, ils comptent chaque mois tout seuls (ou chaque trimestre, chaque année…). Touche une ligne pour la modifier, la mettre en pause, noter le montant réel du mois ou un nouveau montant à partir d'un mois."],
       ['🛒', 'ACHATS ET REVENUS À VENIR', "Un achat prévu pour plus tard compte déjà dans ta fin de mois. Le jour venu, l'accueil te demande « C'est fait ? » : PAYÉ ✓ l'ajoute au Journal."]]],
     ['stats', '📊', 'STATS', 'Tes chiffres dans le temps.', [
-      ['📊', 'ANNÉE ET MOIS', "En haut de l'onglet Stats : la vue de l'année (mois par mois, ton épargne, la comparaison des années) ou celle du mois (le détail par catégorie). Pratique pour voir où part l'argent. <b>Astuce</b> : glisse le doigt de droite à gauche (ou l'inverse) au milieu de l'écran pour passer d'une vue à l'autre."]]],
+      ['📊', 'ANNÉE ET MOIS', "En haut de l'onglet Stats : la vue de l'année (mois par mois, ton épargne, la comparaison des années) ou celle du mois (le détail par catégorie). Pratique pour voir où part l'argent. <b>Astuce</b> : glisse le doigt de droite à gauche (ou l'inverse) au milieu de l'écran pour passer d'une vue à l'autre (et, dans Progrès, de Bilans à Défis, Succès, Style). Sur l'accueil et dans le Journal, le même geste change de mois ; dans Prévu, il passe de « Ce mois-ci » à « Tout l'échéancier »."]]],
     ['progres', '🏆', 'PROGRÈS ET DÉFIS', 'Dans Stats › PROGRÈS : bilans, défis, succès et collection. Pour rendre le budget un peu plus amusant.', [
       ['📜', 'BILANS', "Le récap de chaque mois (du 1er au 5) et l'historique."],
       ['🎯', 'DÉFIS', "Stats › Progrès › Défis : tes séries, le défi du mois, le défi de la semaine, la mission et les événements en cours (détail juste en dessous)."],
@@ -5749,18 +5749,32 @@ document.addEventListener('click', ev => {
   document.addEventListener('touchmove', e => { if (y0 == null) return; ok = e.touches[0].clientY - y0 > 80; ind.classList.toggle('on', ok); }, { passive: true });
   document.addEventListener('touchend', () => { if (ok) { S.lastFetch = 0; rafraichir(true); pomper(); toast('Actualisation…'); } ind.classList.remove('on'); y0 = null; ok = false; });
 })();
-// 9.40 (Théo) : dans Stats, glisser le doigt de côté change de sous-onglet (Année ‹ › Mois ‹ › Progrès).
-// Pas depuis les bords (geste « retour » du téléphone), et seulement un geste franchement horizontal.
-(function glisserStats() {
+// 9.41 (Théo) : glisser le doigt de côté = « suivant / précédent » partout où l'on va à droite ou à gauche :
+// Accueil et Journal → mois suivant / précédent ; Prévu → Ce mois-ci ‹ › Tout l'échéancier ;
+// Stats → Année ‹ › Mois ‹ › Progrès, puis dans Progrès : Bilans ‹ › Défis ‹ › Succès ‹ › Style.
+// Pas depuis les bords (geste « retour » du téléphone), seulement un geste franchement horizontal, jamais fenêtre ouverte.
+(function glisserOnglets() {
   let x0 = null, y0 = null;
   document.addEventListener('touchstart', e => { const t = e.touches[0], W = window.innerWidth;
-    x0 = S.tab === 'stats' && e.touches.length === 1 && !$('#sheet').classList.contains('on') && t.clientX > 30 && t.clientX < W - 30 && !(e.target.closest && e.target.closest('input,textarea,select')) ? t.clientX : null; y0 = t.clientY; }, { passive: true });
+    x0 = e.touches.length === 1 && !$('#sheet').classList.contains('on') && t.clientX > 30 && t.clientX < W - 30 && !(e.target.closest && e.target.closest('input,textarea,select,.pbg')) ? t.clientX : null; y0 = t.clientY; }, { passive: true });
   document.addEventListener('touchend', e => { if (x0 == null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0; x0 = null;
     if (Math.abs(dx) < 70 || Math.abs(dx) < 2 * Math.abs(dy)) return;
-    const L = ['annee', 'mois'].concat(progresVisible() ? ['progres'] : []), cur = S.statsVue === 'progres' && !progresVisible() ? 'annee' : S.statsVue || 'annee';
-    const i = L.indexOf(cur) + (dx < 0 ? 1 : -1); if (i < 0 || i >= L.length) return;
-    S.statsVue = L[i]; rendre(true); scrollTo(0, 0); }, { passive: true });
+    glisserVers(dx < 0 ? 1 : -1); }, { passive: true });
 })();
+function glisserVers(sens) {
+  const voisin = L => { const i = L.findIndex(b => b.classList.contains('on')) + sens; return i >= 0 && i < L.length ? L[i] : null; };
+  if (S.tab === 'home' || S.tab === 'journal') { const b = document.querySelector(`[data-act="${sens > 0 ? 'next' : 'prev'}"]`); if (b) b.click(); return; }
+  if (S.tab === 'prevu') { const b = voisin([...document.querySelectorAll('#view .seg [data-act^="pv:"]')]); if (b) b.click(); return; }
+  if (S.tab !== 'stats') return;
+  const V = [...document.querySelectorAll('#view [data-act^="sv:"]')];
+  if (S.statsVue === 'progres' && progresVisible()) {
+    const P = [...document.querySelectorAll('#view .ptabs button')], b = voisin(P);
+    if (b) { b.click(); scrollTo(0, 0); return; }
+    if (sens < 0) { const m = V.find(x => x.dataset.act === 'sv:mois'); if (m) { m.click(); scrollTo(0, 0); } }
+    return;
+  }
+  const b = voisin(V); if (b) { b.click(); scrollTo(0, 0); }
+}
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { const avant = now.toDateString(); majDate(); if (now.toDateString() !== avant || avant !== new Date().toDateString()) rendre(); rafraichir(false); pomper(); } });
 
 /* ================= DÉMARRAGE ================= */
