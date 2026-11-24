@@ -5331,7 +5331,8 @@ async function passerTelephone(opt) {
     const r2 = await m.appel({ action: 'data', key: S.key });
     if (!r2 || !r2.ok || resumeDonnees(r2.data) !== resumeDonnees(r.data) || !moisCompatibles(r.data, r2.data)) throw new Error('la copie ne correspond pas exactement à ton fichier');
     dire('Création de ta sauvegarde dans ton Drive…');
-    LS.del('svg'); await sv.sauver();
+    { const o = LS.get('svg', null); if (o) LS.set('svg', { json: o.json, sheet: o.sheet, sheetUrl: o.sheetUrl, ids: o.ids, lignes: o.lignes }); } // repasser : mêmes fichiers de sauvegarde
+    await sv.sauver();
     if (interrompu()) throw new Error('une saisie a été faite pendant la copie, recommence');
     S.mode = 'tel'; LS.set('mode', 'tel'); LS.set('telDepuis', { le: new Date().toISOString(), rev: m.revision() });
     S.data = prepData(r2.data); S.journal = entriesFromData(r2.data); S.lastFetch = Date.now(); S.actualise = true; sauver();

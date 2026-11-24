@@ -18,7 +18,8 @@
 
   // Type d'une catégorie (colonne C des Paramètres) : formule dans le fichier. Ici, le type importé du fichier est gardé tel quel ;
   // il n'est déduit (groupe + nom) que pour une catégorie créée, renommée ou changée de groupe sur le téléphone.
-  const typeDe = (g, nom) => !g ? '' : g === 'Revenus' ? 'Revenu' : g === 'Épargne' ? (/retrait/i.test(nom || '') ? 'Retrait' : 'Épargne') : 'Dépense';
+  // Même règle que la formule du fichier (Paramètres!C10) : =IF(A="";"";IF(B="Revenus";"Revenu";IF(B="Épargne";IF(REGEXMATCH(LOWER(A);"^retrait");"Retrait";"Épargne");"Dépense")))
+  const typeDe = (g, nom) => !nom ? '' : g === 'Revenus' ? 'Revenu' : g === 'Épargne' ? (/^retrait/.test(String(nom).toLowerCase()) ? 'Retrait' : 'Épargne') : 'Dépense';
 
   // ---------- Une feuille imitée ----------
   function Feuille(nom, d) {
@@ -116,6 +117,65 @@
     const f = new Function('$S', noms.map(n => 'const ' + n + ' = new Proxy({}, { get: (_, k) => $S.get().' + n + '[k] });').join('\n') + '\n' + code +
       '\n;return { traiter: function (req) { SS_ = null; UIDS_ = null; UIDS_SALE_ = false; return traiter_(req); }, version: VERSION_API };');
     return f;
+  }
+
+  // ---------- Alertes « anomalies » (dans le fichier : formule Journal!A3 et colonne L « Contrôle »), mêmes textes.
+  // Seules celles qui peuvent arriver avec des saisies faites par l'appli : doublon possible, déjà dans l'Échéancier,
+  // montant inhabituel, incohérences de l'Échéancier, solde au 1er janvier, rappels de début de mois / d'année.
+  // L'année vérifiée est l'année en cours (dans le fichier : l'année choisie dans Paramètres).
+  const ACTIONS = { 'Doublon possible': "efface l'une des deux si erreur, sinon change un peu le libellé", "Déjà dans l'Échéancier ?": "si c'est le même paiement, efface la ligne du Journal",
+    'Montant inhabituel': "vérifie la virgule ; si le montant est juste, ajoute ✓ à la fin du libellé", 'Dates incohérentes': "corrige « Depuis » / « Jusqu'en »",
+    'Mois hors de 1 à 12': 'mets un numéro de mois entre 1 et 12', 'Paiement sans mois de départ': 'remplis « 1er mois » (ex. 8 pour août)',
+    "Doublon dans l'Échéancier": "efface l'une des deux lignes si c'est le même paiement", 'Solde au 1er janvier': 'saisis le solde de ton relevé au 1er janvier' };
+  function montantEch(L, y, m, debut) { // colonnes M:X de l'Échéancier : montant d'une ligne pour un mois donné
+    const [lib, , mt, freq, , f, g, h, i, pause] = L;
+    if (!lib || pause === true || typeof mt !== 'number') return 0;
+    if (debut && new Date(y, m - 1, 1) < debut) return 0;
+    if (h !== '' && h != null && y < h) return 0; if (i !== '' && i != null && y > i) return 0;
+    const f1 = Math.max(1, +f || 0), pas = { Mensuel: 1, Trimestriel: 3, Semestriel: 6 }[freq] || 12;
+    const c1 = (h !== '' && h != null && y > h) || m >= f1, c2 = (i !== '' && i != null && y < i) || m <= (g === '' || g == null ? 12 : g);
+    return c1 && c2 && ((((m - f1) % pas) + pas) % pas) === 0 ? mt : 0;
+  }
+  function anomalies(C, auj) {
+    auj = auj || new Date();
+    const val = x => (x && typeof x === 'object' && x.$d) ? x : x;
+    const jou = C.onglets['Journal'], ech = C.onglets['Échéancier'], par = C.onglets['Paramètres'];
+    const groupe = {}; for (let r = 10; r <= 40; r++) { const L = par.v[r]; if (L && L[0]) groupe[String(L[0]).trim()] = String(L[1] || '').trim(); }
+    const Y = auj.getFullYear(), M = auj.getMonth() + 1, mcur = MOIS[M - 1] + ' ' + Y, mprev = M > 1 ? MOIS[M - 2] + ' ' + Y : 'Décembre ' + (Y - 1);
+    const debut = C.debut ? new Date(+C.debut.slice(0, 4), +C.debut.slice(5, 7) - 1, +C.debut.slice(8, 10)) : null;
+    const lignes = Object.keys(jou.v).map(Number).filter(r => r >= 5).sort((a, b) => a - b).map(r => ({ r, L: jou.v[r] })).filter(x => x.L[0] !== '' && x.L[0] != null);
+    const E = Object.keys(ech.v).map(Number).filter(r => r >= 5).sort((a, b) => a - b).map(r => ({ r, L: (ech.v[r] || []).concat(Array(10).fill('')).slice(0, 10) })).filter(x => x.L[0] !== '' || x.L[2] !== '');
+    const res = [];
+    // Doublon possible (mois en cours et précédent)
+    const sel = lignes.filter(x => x.L[0] === mcur || x.L[0] === mprev), cle = x => x.L[0] + '|' + x.L[1] + '|' + x.L[2] + '|' + x.L[3], nb = {};
+    sel.forEach(x => { nb[cle(x)] = (nb[cle(x)] || 0) + 1; });
+    sel.filter(x => nb[cle(x)] > 1).forEach(x => res.push(['Doublon possible', 'Journal, ligne ' + x.r]));
+    // Déjà dans l'Échéancier ? (colonne L : même catégorie, même mois de l'année, montant à 10 % près ; libellé finissant par ✓ ignoré)
+    lignes.forEach(x => {
+      const p = String(x.L[0]).split(' '), mo = MOIS.indexOf(p[0]) + 1, an = +p[1];
+      if (an !== Y || mo < 1 || /✓\s*$/.test(String(x.L[1] || ''))) return;
+      const d = typeof x.L[3] === 'number' ? x.L[3] : 0;
+      if (E.some(e => e.L[1] === x.L[2] && (() => { const a = montantEch(e.L, Y, mo, debut); return a > 0 && Math.abs(d - a) <= 0.1 * a; })())) res.push(["Déjà dans l'Échéancier ?", 'Journal, ligne ' + x.r]);
+    });
+    // Échéancier
+    E.forEach(e => { const [a, , , d, , f, g, h, i] = e.L; if (a === '') return; const R = 'Échéancier, ligne ' + e.r;
+      if (h !== '' && i !== '' && +i < +h) res.push(['Dates incohérentes', R]);
+      if ((f !== '' && (+f < 1 || +f > 12)) || (g !== '' && (+g < 1 || +g > 12))) res.push(['Mois hors de 1 à 12', R]);
+      if (d !== 'Mensuel' && d !== '' && f === '') res.push(['Paiement sans mois de départ', R]); });
+    // Montant inhabituel (≥ 1 000 €, mois en cours et précédent, hors Revenus et Épargne, libellé sans ✓)
+    lignes.forEach(x => { const d = x.L[3], g = groupe[String(x.L[2]).trim()];
+      if ((x.L[0] === mcur || x.L[0] === mprev) && typeof d === 'number' && d >= 1000 && g !== 'Revenus' && g !== 'Épargne' && !/✓\s*$/.test(String(x.L[1] || ''))) res.push(['Montant inhabituel : ' + Math.round(d) + ' €', 'Journal, ligne ' + x.r]); });
+    const cE = {}; E.forEach(e => { if (e.L[0] !== '') { const k = e.L[0] + '|' + e.L[1] + '|' + e.L[2]; cE[k] = (cE[k] || 0) + 1; } });
+    E.forEach(e => { if (e.L[0] !== '' && cE[e.L[0] + '|' + e.L[1] + '|' + e.L[2]] > 1) res.push(["Doublon dans l'Échéancier", 'Échéancier, ligne ' + e.r]); });
+    // Solde au 1er janvier de l'année en cours
+    let solde = 0; for (let r = 52; r <= 78; r++) { const L = par.v[r]; if (L && String(L[0]) === String(Y)) solde = typeof L[1] === 'number' ? L[1] : 0; }
+    if (!solde) res.push(['Solde au 1er janvier ' + Y + ' non saisi', 'Paramètres ③']);
+    const k = res.length, act = n => ACTIONS[Object.keys(ACTIONS).find(a => n.startsWith(a))] || 'à vérifier';
+    const lst = k === 0 ? '✅ Aucune anomalie dans les saisies' : '⚠ ' + k + ' ANOMALIE(S) À CORRIGER\n' + res.slice(0, 8).map(([n, o]) => '•  ' + n + '  —  ' + o + '  →  ' + act(n)).join('\n') + (k > 8 ? '\n•  … et ' + (k - 8) + ' autre(s) : corrige d\'abord celles-ci' : '');
+    const rap = [lst];
+    if (auj.getDate() <= 4) rap.push('📅 Rappel (pas une anomalie) : nouveau mois, salaire arrivé, contrôle ton solde bancaire dans Paramètres ②');
+    if (M === 1 && auj.getDate() <= 4) rap.push('📅 Rappel nouvelle année : revois tes budgets (Paramètres ①)');
+    void val; return rap.join('\n');
   }
 
   // ---------- Mois et années à venir : la liste des mois (Paramètres, colonne N) et les années des soldes (A52:A90)
@@ -246,9 +306,11 @@
         try { await ecrireTout(db, { classeur: JSON.stringify(C), rev: C.rev }); }
         catch (err) { C = JSON.parse(avant); return { ok: false, error: 'OCCUPE', message: "Pas pu enregistrer sur le téléphone, nouvel essai automatique." }; }
       }
+      if (res && res.ok && res.data && req.action === 'data') { try { res.data.anomalies = anomalies(C); } catch (e) { res.data.anomalies = ''; } }
       return res;
     }
   }
   window.MoteurTelephone = Moteur;
   window.MoteurTelephone.depuisDonnees = depuisDonnees;   // pour les tests
+  window.MoteurTelephone.anomalies = anomalies;
 })();

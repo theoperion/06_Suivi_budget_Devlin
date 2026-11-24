@@ -98,6 +98,9 @@
           body: JSON.stringify({ properties: { title: NOM_SHEET, locale: 'fr_FR', timeZone: 'Europe/Paris' }, sheets: ONGLETS.map(t => ({ properties: { title: t, gridProperties: { rowCount: 1000, columnCount: 26 } } })) }) });
         e.sheet = s.spreadsheetId; e.sheetUrl = s.spreadsheetUrl; e.ids = {}; e.lignes = {};
         s.sheets.forEach(x => { e.ids[x.properties.title] = x.properties.sheetId; e.lignes[x.properties.title] = x.properties.gridProperties.rowCount; });
+        // Le fichier technique doit connaître ce Sheet (sinon une reprise en créerait un 2e) : on le réécrit une fois
+        await g('https://www.googleapis.com/upload/drive/v3/files/' + e.json + '?uploadType=media&fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ app: 'jauge', format: 1, sauve: new Date().toISOString(), sheet: e.sheet, sheetUrl: e.sheetUrl, ids: e.ids, lignes: e.lignes, classeur: C }) });
       }
       const G = {}; ONGLETS.forEach(t => { G[t] = C.onglets[t] ? grille(C.onglets[t], t) : [['']]; });
       const agrandir = ONGLETS.filter(t => G[t].length > (e.lignes[t] || 1000) && e.ids[t] != null).map(t => {
