@@ -773,7 +773,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.44';
+const VERSION = '9.45';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -788,7 +788,7 @@ const API_UID = '5.14';
 // (phase 2) « Mes données sur ce téléphone » : le même script tourne dans le téléphone (moteur.js), sans fichier Google.
 // Visible dans Réglages seulement quand TEL_DISPO est vrai (en attendant la sauvegarde automatique dans le Drive),
 // ou si ce téléphone est déjà passé en mode téléphone.
-const TEL_DISPO = false; // (copies de Clément et Devlin : forcé à false par commun/generer.py)
+const TEL_DISPO = false; // essai arrêté par Théo le 24/11 (il reste sur son fichier) ; l'option reste visible tant qu'un téléphone est en mode téléphone
 // Sauvegarde dans le Drive (sauvegarde.js) : identifiant de l'appli chez Google (public, ce n'est pas un secret).
 const GOOGLE_CLIENT_ID = '744152701006-9cm0gsv6sr23ipgq02jikgo5ccacrit4.apps.googleusercontent.com';
 // Compare les versions partie par partie : « 5.10 » est bien plus récent que « 5.2 ».
@@ -5306,8 +5306,8 @@ function rendreDonnees() {
         <div class="note" style="display:block;margin-top:8px">La sauvegarde se fait toute seule pendant 1 heure après chaque SAUVEGARDER MAINTENANT. Ensuite, touche ce bouton quand tu as saisi des dépenses (l'appli te le rappelle). Pendant l'essai, Google redemandera ton accord environ une fois par semaine : c'est normal.</div>`;
     }
     h += `<div class="grp" style="margin-top:18px">TON ANCIEN FICHIER</div>
-      <div class="note" style="display:block">Il est resté tel qu'au jour du passage. Si tu y reviens, les dépenses saisies sur ce téléphone depuis n'y seront pas.</div>
-      <button class="danger ${f.arm ? 'armed' : ''}" data-act="donnees-fichier" style="margin-top:10px">${f.arm ? 'TOUCHE ENCORE : RETOUR À L\'ANCIEN FICHIER (sans les dépenses saisies ici)' : 'REVENIR À MON ANCIEN FICHIER'}</button>`;
+      <div class="note" style="display:block">Il est resté tel qu'au jour du passage. Si tu y reviens, les dépenses saisies sur ce téléphone depuis y sont renvoyées (pas les autres changements : Échéancier, catégories, budgets).</div>
+      <button class="danger ${f.arm ? 'armed' : ''}" data-act="donnees-fichier" style="margin-top:10px">${f.arm ? 'TOUCHE ENCORE : RETOUR À MON ANCIEN FICHIER' : 'REVENIR À MON ANCIEN FICHIER'}</button>`;
   }
   $('#sheetIn').innerHTML = h;
   if (tel && e) moteurTel().then(async m => { await m.appel({ action: 'data', key: S.key }).catch(() => {});
@@ -5370,11 +5370,29 @@ async function restaurerDrive() {
     fermer(); rendre(true); toastOK('Sauvegarde reprise : tes données sont sur ce téléphone.');
   } catch (e) { dire('Pas repris : ' + (e && e.message || e)); }
 }
+// Retour au fichier : les dépenses saisies sur le téléphone depuis le passage (absentes du fichier) y sont renvoyées,
+// ainsi que les réglages (jeu, tirelires…) changés entre-temps. Les autres changements (Échéancier, catégories, budgets) ne suivent pas.
 async function revenirFichier() {
   if (S.queue.length) { const z = $('#ferr'); if (z) z.textContent = 'Un enregistrement est en cours, réessaie dans un instant.'; return; }
+  let telD = null;
+  try { const m = await moteurTel(); const r = await m.appel({ action: 'data', key: S.key }); if (r && r.ok) telD = r.data; } catch (e) {}
   S.mode = 'fichier'; LS.set('mode', 'fichier'); S.lastFetch = 0; S.form = null; fermer();
-  await rafraichir(true); rendre(true);
-  toastOK('Retour à ton fichier Google : tu le retrouves tel qu\'au jour du passage.');
+  await rafraichir(true);
+  let n = 0;
+  if (telD && S.data) {
+    const cle = l => l.mois + '|' + l.lib + '|' + l.cat + '|' + Number(l.montant), reste = {};
+    (S.journal || []).filter(e => !e.deleted).forEach(e => { const k = cle(e); reste[k] = (reste[k] || 0) + 1; });
+    (telD.journal || []).forEach(l => {
+      const k = cle(l); if (reste[k] > 0) { reste[k]--; return; }
+      const p = parseMois(l.mois); if (!p) return;
+      const e = { id: uid(), row: null, date: l.date || auj(), mois: l.mois, lib: l.lib, cat: l.cat, montant: Number(l.montant), especes: !!l.especes, y: p.y, m: p.m, srv: null, pending: true, nw: true };
+      S.journal.push(e); enfiler({ op: 'add', id: e.id }); n++;
+    });
+    Object.keys(telD.prefs || {}).forEach(k => { if (JSON.stringify(telD.prefs[k]) !== JSON.stringify((S.data.prefs || {})[k])) setPref(k, telD.prefs[k]); });
+    memo = new Map();
+  }
+  rendre(true);
+  toastOK('Retour à ton fichier Google' + (n ? ' : ' + n + ' dépense' + (n > 1 ? 's' : '') + ' saisie' + (n > 1 ? 's' : '') + ' sur le téléphone ' + (n > 1 ? 'y sont renvoyées' : 'y est renvoyée') + '.' : '.'));
 }
 
 /* ================= TOAST ================= */
