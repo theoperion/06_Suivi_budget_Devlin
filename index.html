@@ -772,7 +772,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.43';
+const VERSION = '9.44';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -787,7 +787,9 @@ const API_UID = '5.14';
 // (phase 2) « Mes données sur ce téléphone » : le même script tourne dans le téléphone (moteur.js), sans fichier Google.
 // Visible dans Réglages seulement quand TEL_DISPO est vrai (en attendant la sauvegarde automatique dans le Drive),
 // ou si ce téléphone est déjà passé en mode téléphone.
-const TEL_DISPO = false;
+const TEL_DISPO = false; // (copies de Clément et Devlin : forcé à false par commun/generer.py)
+// Sauvegarde dans le Drive (sauvegarde.js) : identifiant de l'appli chez Google (public, ce n'est pas un secret).
+const GOOGLE_CLIENT_ID = '744152701006-9cm0gsv6sr23ipgq02jikgo5ccacrit4.apps.googleusercontent.com';
 // Compare les versions partie par partie : « 5.10 » est bien plus récent que « 5.2 ».
 const versionAuMoins = (v, min) => { const a = String(v || '0').split('.').map(Number), b = String(min).split('.').map(Number); for (let i = 0; i < Math.max(a.length, b.length); i++) { const x = a[i] || 0, y = b[i] || 0; if (x !== y) return x > y; } return true; };
 
@@ -874,8 +876,25 @@ function moteurTel() {
     document.head.appendChild(s);
   }));
 }
+let SV_ = null;
+function sauvegardeTel() {
+  return SV_ || (SV_ = new Promise((ok, ko) => {
+    const cree = () => ok(new SauvegardeDrive({ clientId: GOOGLE_CLIENT_ID, LS, moteur: moteurTel, delai: window.__svgDelai })); // __svgDelai : tests seulement
+    if (window.SauvegardeDrive) return cree();
+    const s = document.createElement('script'); s.src = 'sauvegarde.js';
+    s.onload = () => window.SauvegardeDrive ? cree() : (SV_ = null, ko(new Error('Sauvegarde illisible')));
+    s.onerror = () => { SV_ = null; ko(new Error('Sauvegarde introuvable (pas de réseau ?)')); };
+    document.head.appendChild(s);
+  }));
+}
+// Après chaque changement en mode téléphone : sauvegarde Drive regroupée (si elle est activée et l'accès Google encore valable)
+function planifierSauvegarde() {
+  if (S.mode !== 'tel' || !LS.get('svg', null)) return;
+  sauvegardeTel().then(sv => sv.planifier((ok, msg) => { S.svgMsg = ok ? '' : msg; if (S.form && S.form.mode === 'donnees') rendreForm(); })).catch(() => {});
+}
 function api(action, extra) {
   if (S.mode === 'tel') return moteurTel().then(m => m.appel(Object.assign({ action, key: S.key }, extra || {}))).then(r => {
+    if (r && r.ok && action !== 'data') planifierSauvegarde();
     // Données du téléphone effacées (navigateur qui libère de la place…) : retour automatique au fichier Google, jamais bloqué.
     if (r && r.error === 'SANS_CLE' && S.mode === 'tel') {
       S.mode = 'fichier'; LS.set('mode', 'fichier'); LS.del('telDepuis');
@@ -5260,14 +5279,26 @@ function rendreDonnees() {
   if (!tel) h += `<div class="grp" style="margin-top:14px">OÙ SONT MES DONNÉES</div>
     <div class="note" style="display:block">Aujourd'hui, tes dépenses sont dans <b>ton fichier Google Sheets</b> : l'appli passe par ton script pour les lire et les écrire.</div>
     <div class="note" style="display:block;margin-top:8px">Sur <b>ce téléphone</b>, elles sont gardées dans le téléphone : plus de script, tout est instantané, même sans réseau. Ton fichier Google ne bouge plus : il reste tel qu'au jour du passage, comme filet de sécurité, et tu peux y revenir à tout moment.</div>
-    <div class="note" style="display:block;margin-top:8px">⚠ <b>Essai</b> : la sauvegarde automatique dans ton Drive arrive bientôt. D'ici là, ce que tu saisis après le passage n'existe que sur ce téléphone.</div>
-    <div class="err" id="ferr"></div><button class="go" data-act="donnees-tel">PASSER SUR CE TÉLÉPHONE</button>`;
+    <div class="note" style="display:block;margin-top:8px">⚠ <b>Essai</b> : juste après le passage, active la <b>sauvegarde dans ton Drive</b> (un Google Sheet mis à jour tout seul). Sans elle, ce que tu saisis ensuite n'existe que sur ce téléphone.</div>
+    <div class="err" id="ferr"></div><button class="go" data-act="donnees-tel">PASSER SUR CE TÉLÉPHONE</button>
+    <div class="grp" style="margin-top:22px">NOUVEAU TÉLÉPHONE</div>
+    <div class="note" style="display:block">Tu étais déjà sur un téléphone avec une sauvegarde dans ton Drive ? Reprends-la ici.</div>
+    <button class="ghost" data-act="drive-restaurer" style="margin-top:8px">${f.armR ? 'TOUCHE ENCORE : REPRENDRE LA SAUVEGARDE DU ' + esc(f.armR) : 'REPRENDRE MA SAUVEGARDE DU DRIVE'}</button>`;
   else h += `<div class="grp" style="margin-top:14px">OÙ SONT MES DONNÉES</div>
     <div class="note" style="display:block">Tes données sont <b>sur ce téléphone</b>${dep ? ' depuis le ' + esc(new Date(dep.le).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })) : ''} · <span id="telrev">…</span></div>
-    <div class="note" style="display:block;margin-top:8px">Ton fichier Google est resté tel qu'au jour du passage. Si tu y reviens, les changements faits ici depuis n'y seront pas.</div>
+    <div class="grp" style="margin-top:18px">SAUVEGARDE DANS TON DRIVE</div>
+    ${(() => { const e = LS.get('svg', null);
+      if (!e) return `<div class="note" style="display:block">⚠ <b>Pas encore activée</b> : si ce téléphone est perdu ou effacé, ce que tu as saisi ici serait perdu. Active-la : un Google Sheet « Jauge · sauvegarde » sera créé dans ton Drive et mis à jour tout seul.</div>
+        <button class="go" data-act="drive-connecter" style="margin-top:8px">ACTIVER LA SAUVEGARDE DRIVE</button>`;
+      const quand = new Date(e.le).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      return `<div class="note" style="display:block">Dernière sauvegarde : <b>${esc(quand)}</b> · <span id="svgEtat">…</span>${S.svgMsg ? '<br><span class="c-bad">' + esc(S.svgMsg) + '</span>' : ''}</div>
+        ${e.sheetUrl ? `<a class="opt" href="${esc(e.sheetUrl)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir la sauvegarde (Google Sheets)</span><span class="muted">↗</span></a>` : ''}
+        <button class="ghost" data-act="drive-sauver" style="margin-top:8px">SAUVEGARDER MAINTENANT</button>`; })()}
+    <div class="note" style="display:block;margin-top:14px">Ton fichier Google d'avant est resté tel qu'au jour du passage. Si tu y reviens, les changements faits ici depuis n'y seront pas.</div>
     <div class="err" id="ferr"></div><button class="danger ${f.arm ? 'armed' : ''}" data-act="donnees-fichier" style="margin-top:14px">${f.arm ? 'TOUCHE ENCORE : RETOUR AU FICHIER (sans les changements faits ici)' : 'REVENIR À MON FICHIER GOOGLE'}</button>`;
   $('#sheetIn').innerHTML = h;
-  if (tel) moteurTel().then(m => { const z = $('#telrev'), n = m.revision() - ((dep && dep.rev) || 0); if (z) z.textContent = n > 0 ? n + ' changement' + (n > 1 ? 's' : '') + ' depuis' : 'aucun changement depuis'; }).catch(() => {});
+  if (tel) moteurTel().then(async m => { await m.appel({ action: 'data', key: S.key }).catch(() => {}); const z = $('#telrev'), n = m.revision() - ((dep && dep.rev) || 0); if (z) z.textContent = n > 0 ? n + ' changement' + (n > 1 ? 's' : '') + ' depuis' : 'aucun changement depuis';
+    const e = LS.get('svg', null), w = $('#svgEtat'); if (w && e) { const k = m.revision() - (e.rev || 0); w.textContent = k > 0 ? k + ' changement' + (k > 1 ? 's' : '') + ' à sauvegarder' : 'à jour ✓'; } }).catch(() => {});
 }
 async function passerTelephone() {
   const dire = x => { const z = $('#ferr'); if (z) z.textContent = x; };
@@ -5288,6 +5319,36 @@ async function passerTelephone() {
     S.busy = false; fermer(); rendre(true);
     toastOK('Tes données sont maintenant sur ce téléphone. Ton fichier Google reste tel quel, comme filet de sécurité.');
   } catch (e) { S.busy = false; dire("Passage annulé, rien n'a changé : " + (e && e.message || e)); if (S.queue.length) pomper(); } // une saisie faite pendant la copie part tout de suite au fichier
+}
+// Sauvegarde Drive à la demande (le toucher sert de « geste » : Google peut ouvrir sa fenêtre de connexion).
+async function sauverDrive(premiere) {
+  const dire = x => { const z = $('#ferr'); if (z) z.textContent = x; else toast(x); };
+  try {
+    const sv = await sauvegardeTel();
+    if (!sv.connecte()) { dire('Connexion à Google…'); await sv.connecter(premiere || !LS.get('svg', null)); }
+    dire('Sauvegarde en cours…'); await sv.sauver(); S.svgMsg = '';
+    if (S.form && S.form.mode === 'donnees') rendreForm();
+    toast('Sauvegardé dans ton Drive ✓');
+  } catch (e) { dire('Sauvegarde pas faite : ' + (e && e.message || e)); }
+}
+// Nouveau téléphone : reprendre la dernière sauvegarde du Drive (2 touchers : on montre d'abord sa date)
+async function restaurerDrive() {
+  const f = S.form, dire = x => { const z = $('#ferr'); if (z) z.textContent = x; };
+  if (S.queue.length) return dire("Il reste des envois en attente vers ton fichier : attends qu'ils partent, puis recommence.");
+  try {
+    const sv = await sauvegardeTel();
+    if (!sv.connecte()) { dire('Connexion à Google…'); await sv.connecter(true); }
+    dire('Recherche de ta sauvegarde…');
+    const d = await sv.lireDrive();
+    if (!d) return dire('Aucune sauvegarde de Jauge trouvée dans ce compte Google.');
+    if (!f.armR || f.idR !== d.id) { f.armR = new Date(d.sauve).toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).toUpperCase(); f.idR = d.id; rendreForm(); return; }
+    const m = await moteurTel(); await m.restaurer(d.classeur, S.key);
+    const r = await m.appel({ action: 'data', key: S.key }); if (!r || !r.ok) throw new Error((r && r.message) || 'sauvegarde illisible');
+    S.mode = 'tel'; LS.set('mode', 'tel'); LS.set('telDepuis', { le: new Date().toISOString(), rev: m.revision() });
+    LS.set('svg', Object.assign({}, LS.get('svg', {}) || {}, { json: d.id, le: d.sauve, rev: m.revision() }));
+    S.data = prepData(r.data); S.journal = entriesFromData(r.data); S.lastFetch = Date.now(); S.actualise = true; sauver();
+    fermer(); rendre(true); toastOK('Sauvegarde reprise : tes données sont sur ce téléphone.');
+  } catch (e) { dire('Pas repris : ' + (e && e.message || e)); }
 }
 async function revenirFichier() {
   if (S.queue.length) { const z = $('#ferr'); if (z) z.textContent = 'Un enregistrement est en cours, réessaie dans un instant.'; return; }
@@ -5815,6 +5876,8 @@ document.addEventListener('click', ev => {
     case 'go:lien': S.form = { mode: 'lien', url: S.api }; rendreForm(); break;
     case 'go:donnees': S.form = { mode: 'donnees' }; rendreForm(); break;
     case 'donnees-tel': passerTelephone(); break;
+    case 'drive-connecter': case 'drive-sauver': sauverDrive(a === 'drive-connecter'); break;
+    case 'drive-restaurer': restaurerDrive(); break;
     case 'donnees-fichier': if (!S.form.arm) { S.form.arm = true; rendreForm(); } else revenirFichier(); break;
     case 'lien-ok': okLien(); break;
   }
@@ -5854,6 +5917,12 @@ function glisserVers(sens) {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { const avant = now.toDateString(); majDate(); if (now.toDateString() !== avant || avant !== new Date().toDateString()) rendre(); rafraichir(false); pomper(); } });
 
 /* ================= DÉMARRAGE ================= */
+if (S.mode === 'tel') setTimeout(() => moteurTel().then(m => {
+  const e = LS.get('svg', null), j = 86400000, vu = LS.get('svgRappel', 0);
+  if (Date.now() - vu < j / 2) return;
+  if (!e) { LS.set('svgRappel', Date.now()); toast('Tes données sont seulement sur ce téléphone : active la sauvegarde Drive', 'ACTIVER', () => { ouvrirReglages(); S.form = { mode: 'donnees' }; rendreForm(); }); }
+  else if (m.revision() !== e.rev && Date.now() - new Date(e.le).getTime() > j) { LS.set('svgRappel', Date.now()); toast('Dernière sauvegarde Drive il y a plus d\'un jour', 'SAUVEGARDER', () => sauverDrive(false)); }
+}).catch(() => {}), 4000);
 if (!S.key || !S.api) verrouiller(); else { rendre(); rafraichir(true); pomper(); if (/[?&]saisie=1/.test(location.search)) { ouvrirSaisie(null); try { history.replaceState(history.state, '', location.pathname); } catch (e) {} } }
 // (9.27) Mises à jour automatiques : quand une nouvelle version est installée, l'appli se recharge d'elle-même
 // (jamais pendant une saisie : elle attend que la fenêtre soit fermée). Au retour au premier plan (Firefox garde l'appli

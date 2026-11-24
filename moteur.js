@@ -197,6 +197,14 @@
       try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) {}
       return true;
     };
+    // Restaurer une sauvegarde (nouveau téléphone, ou téléphone effacé) : le classeur complet remplace celui du téléphone.
+    M.restaurer = async (C2, cle) => {
+      if (!C2 || !C2.onglets || !C2.onglets['Journal'] || !C2.onglets['Paramètres'] || !C2.props) throw new Error('sauvegarde illisible');
+      const nouveau = JSON.parse(JSON.stringify(C2)); if (cle) nouveau.props.APP_KEY = cle;
+      await ouvrirBase(); const r0 = await lireKV(db, 'rev'); nouveau.rev = Math.max(nouveau.rev || 0, r0 || 0) + 1;
+      await ecrireTout(db, { classeur: JSON.stringify(nouveau), rev: nouveau.rev }); C = nouveau;
+      return true;
+    };
     M.revision = () => (C ? C.rev : 0);
     M.instantane = () => (C ? JSON.parse(JSON.stringify(C)) : null);   // pour la sauvegarde
     // Une demande à la fois, dans l'ordre (comme le verrou du script)
