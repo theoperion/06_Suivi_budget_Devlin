@@ -42,7 +42,8 @@
   function Sauvegarde(opt) {
     // opt : { clientId, LS, moteur: () => Promise<MoteurTelephone> }
     const B = this, LS = opt.LS;
-    let jeton = null, expire = 0, client = null, attente = null;
+    let jeton = null, expire = 0, client = null, attente = null, enCours = Promise.resolve();
+    B.precharger = () => chargerGIS();
     B.etat = () => LS.get('svg', null);              // { sheet, sheetUrl, json, ids: {onglet: id}, lignes: {onglet: n}, le, rev, compte }
     B.connecte = () => !!(jeton && Date.now() < expire - 60000);
     B.aJour = rev => { const e = B.etat(); return !!(e && e.rev === rev); };
@@ -66,17 +67,30 @@
     }
 
     // Une sauvegarde complète : fichier technique puis Google Sheet. Rien n'est écrit dans le téléphone sauf la date.
-    B.sauver = async () => {
+    // Les sauvegardes passent l'une après l'autre (bouton pendant une sauvegarde automatique : pas de mélange).
+    B.sauver = () => (enCours = enCours.then(faire, faire));
+    async function faire() {
       if (!B.connecte()) throw new Error('pas connecté au Drive');
       const M = await opt.moteur(), C = M.instantane(); if (!C) throw new Error('aucune donnée sur ce téléphone');
       const e = Object.assign({ ids: {}, lignes: {} }, B.etat() || {});
       // 1) fichier technique (JSON complet)
-      const corps = JSON.stringify({ app: 'jauge', format: 1, sauve: new Date().toISOString(), classeur: C });
+      const corps = JSON.stringify({ app: 'jauge', format: 1, sauve: new Date().toISOString(), sheet: e.sheet || null, sheetUrl: e.sheetUrl || null, ids: e.ids, lignes: e.lignes, classeur: C });
       const json = await (e.json
         ? g('https://www.googleapis.com/upload/drive/v3/files/' + e.json + '?uploadType=media&fields=id', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: corps })
           .catch(err => { if (/ 404/.test(err.message)) { e.json = null; return null; } throw err; })
         : null) || (e.json ? { id: e.json } : await creerJSON(corps));
       e.json = json.id;
+      // Une copie datée par jour (les 7 derniers jours) : une erreur ne peut jamais écraser toutes les sauvegardes.
+      const jour = new Date().toISOString().slice(0, 10);
+      if (e.copieJour !== jour) {
+        try {
+          await creerJSON(corps, 'Jauge · sauvegarde du ' + jour + ' (ne pas modifier).json', { jauge: 'copie', jour });
+          const q = encodeURIComponent("appProperties has { key='jauge' and value='copie' } and trashed=false");
+          const L = await g('https://www.googleapis.com/drive/v3/files?q=' + q + '&orderBy=createdTime desc&pageSize=50&fields=files(id)');
+          for (const f of (L.files || []).slice(7)) await g('https://www.googleapis.com/drive/v3/files/' + f.id, { method: 'DELETE' }).catch(() => {});
+          e.copieJour = jour;
+        } catch (err) { /* la copie du jour n'empêche jamais la sauvegarde */ }
+      }
       // 2) Google Sheet lisible (créé une fois, puis vidé et réécrit)
       if (e.sheet) { try { await g('https://sheets.googleapis.com/v4/spreadsheets/' + e.sheet + '?fields=spreadsheetId'); } catch (err) { if (/ 404/.test(err.message)) e.sheet = null; else throw err; } }
       if (!e.sheet) {
@@ -92,16 +106,17 @@
       });
       if (agrandir.length) await g('https://sheets.googleapis.com/v4/spreadsheets/' + e.sheet + ':batchUpdate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requests: agrandir }) });
       const q = n => "'" + n.replace(/'/g, "''") + "'";
-      await g('https://sheets.googleapis.com/v4/spreadsheets/' + e.sheet + '/values:batchClear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ranges: ONGLETS.map(q) }) });
+      // Écrire d'abord, effacer ensuite seulement ce qui dépasse : une coupure au milieu ne laisse jamais le Sheet vide.
       await g('https://sheets.googleapis.com/v4/spreadsheets/' + e.sheet + '/values:batchUpdate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ valueInputOption: 'RAW', data: ONGLETS.map(t => ({ range: q(t) + '!A1', values: G[t] })) }) });
+        body: JSON.stringify({ valueInputOption: 'RAW', data: ONGLETS.map(t => ({ range: q(t) + '!A1', values: G[t].map(L => L.concat(Array(Math.max(0, 26 - L.length)).fill('')).slice(0, 26)) })) }) });
+      await g('https://sheets.googleapis.com/v4/spreadsheets/' + e.sheet + '/values:batchClear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ranges: ONGLETS.map(t => q(t) + '!A' + (G[t].length + 1) + ':Z') }) });
       e.le = new Date().toISOString(); e.rev = C.rev;
       LS.set('svg', e);
       return e;
-    };
-    async function creerJSON(corps) {
+    }
+    async function creerJSON(corps, nom, props) {
       const sep = 'jauge' + Math.random().toString(36).slice(2);
-      const meta = { name: NOM_JSON, mimeType: 'application/json', appProperties: { jauge: 'sauvegarde' } };
+      const meta = { name: nom || NOM_JSON, mimeType: 'application/json', appProperties: props || { jauge: 'sauvegarde' } };
       const body = '--' + sep + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) + '\r\n--' + sep + '\r\nContent-Type: application/json\r\n\r\n' + corps + '\r\n--' + sep + '--';
       return g('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + sep }, body });
     }

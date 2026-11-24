@@ -16,8 +16,9 @@
   const deJSON = v => v && typeof v === 'object' && typeof v.$d === 'string' ? new Date(+v.$d.slice(0, 4), +v.$d.slice(5, 7) - 1, +v.$d.slice(8, 10), +v.$d.slice(11, 13) || 0, +v.$d.slice(14, 16) || 0, +v.$d.slice(17, 19) || 0) : v;
   const affiche = v => v instanceof Date ? pad(v.getDate()) + '/' + pad(v.getMonth() + 1) + '/' + v.getFullYear() : v === true ? 'TRUE' : v === false ? 'FALSE' : String(v);
 
-  // Type d'une catégorie (colonne C des Paramètres) : formule dans le fichier, déduite du groupe ici.
-  const typeDe = g => !g ? '' : g === 'Revenus' ? 'Revenu' : g === 'Épargne' ? 'Épargne' : 'Dépense';
+  // Type d'une catégorie (colonne C des Paramètres) : formule dans le fichier. Ici, le type importé du fichier est gardé tel quel ;
+  // il n'est déduit (groupe + nom) que pour une catégorie créée, renommée ou changée de groupe sur le téléphone.
+  const typeDe = (g, nom) => !g ? '' : g === 'Revenus' ? 'Revenu' : g === 'Épargne' ? (/retrait/i.test(nom || '') ? 'Retrait' : 'Épargne') : 'Dépense';
 
   // ---------- Une feuille imitée ----------
   function Feuille(nom, d) {
@@ -29,13 +30,11 @@
       const L = d.v[r] || (d.v[r] = []);
       while (L.length < c) L.push('');
       L[c - 1] = x === undefined || x === null ? '' : enJSON(x);
+      // Paramètres : le nom ou le groupe d'une catégorie change → son type (colonne C) est recalculé
+      if (nom === 'Paramètres' && r >= 10 && r <= 40 && (c === 1 || c === 2)) { while (L.length < 3) L.push(''); L[2] = typeDe(String(L[1] || '').trim(), String(L[0] || '').trim()); }
       if (L.every(y => y === '')) delete d.v[r];
     };
-    const lire = (r, c) => {
-      // Paramètres, colonne C des catégories : calculée depuis le groupe (comme la formule du fichier)
-      if (nom === 'Paramètres' && c === 3 && r >= 10 && r <= 40) return typeDe(String(cell(r, 2)).trim());
-      return cell(r, c);
-    };
+    const lire = (r, c) => cell(r, c);
     sh.getName = () => nom;
     sh.getMaxRows = () => d.n;
     sh.getMaxColumns = () => d.c;
@@ -119,6 +118,28 @@
     return f;
   }
 
+  // ---------- Mois et années à venir : la liste des mois (Paramètres, colonne N) et les années des soldes (A52:A90)
+  // vont toujours jusqu'à décembre de l'an prochain (dans le fichier, c'était fait à la main ou par formule).
+  function etendreMois(C) {
+    const par = C.onglets['Paramètres']; if (!par) return false;
+    const fin = new Date().getFullYear() + 1; let change = false;
+    const liste = []; for (let r = 4; r <= par.n; r++) { const L = par.v[r]; const x = L && L[13]; if (x) liste.push([r, String(x)]); }
+    const der = liste.length ? liste[liste.length - 1] : null;
+    let y, m, r;
+    if (der) { const k = der[1].split(' '); m = MOIS.indexOf(k[0]); y = +k[1]; r = der[0]; } else { y = new Date().getFullYear(); m = -1; r = 3; }
+    if (m < 0 && der) return false; // liste illisible : on ne touche à rien
+    while (y < fin || (y === fin && m < 11)) {
+      m++; if (m > 11) { m = 0; y++; } r++;
+      if (r > par.n) par.n = r;
+      const L = par.v[r] || (par.v[r] = []); while (L.length < 14) L.push(''); L[13] = MOIS[m] + ' ' + y; change = true;
+    }
+    const ans = []; for (let k = 52; k <= 90; k++) { const L = par.v[k]; if (L && L[0] !== '' && L[0] != null) ans.push(+L[0]); }
+    let libre = 52; while (libre <= 90 && par.v[libre] && par.v[libre][0] !== '' && par.v[libre][0] != null) libre++;
+    const maxAn = ans.length ? Math.max(...ans) : new Date().getFullYear() - 1;
+    for (let a = maxAn + 1; a <= fin && libre <= 90; a++, libre++) { const L = par.v[libre] || (par.v[libre] = []); while (L.length < 2) L.push(''); L[0] = a; change = true; }
+    return change;
+  }
+
   // ---------- Fabriquer le classeur à partir de la réponse « data » du fichier Google (import, une seule fois) ----------
   function depuisDonnees(data, cle) {
     const ligneMax = (L, k, min) => L.reduce((m, x) => Math.max(m, +x[k] || 0), min);
@@ -131,7 +152,7 @@
     for (let r = 10; r <= 40; r++) { met(par, r, 1, 'Catégorie libre'); met(par, r, 5, 'Annuel'); }
     (data.categories || []).forEach(c => {
       if (!(c.ligne >= 10 && c.ligne <= 40)) throw new Error('Catégorie hors des lignes 10 à 40 : ' + c.nom);
-      met(par, c.ligne, 1, c.nom); met(par, c.ligne, 2, c.groupe); met(par, c.ligne, 4, typeof c.budget === 'number' ? c.budget : ''); met(par, c.ligne, 5, c.suivi || '');
+      met(par, c.ligne, 1, c.nom); met(par, c.ligne, 2, c.groupe); met(par, c.ligne, 3, c.type || ''); met(par, c.ligne, 4, typeof c.budget === 'number' ? c.budget : ''); met(par, c.ligne, 5, c.suivi || '');
     });
     const ctl = data.controle || {};
     met(par, 43, 2, ctl.mois || ''); met(par, 44, 2, typeof ctl.solde === 'number' ? ctl.solde : ''); met(par, 45, 2, typeof ctl.especes === 'number' ? ctl.especes : '');
@@ -214,6 +235,7 @@
     async function traiterUne(req) {
       await charger();
       if (!C) return { ok: false, error: 'SANS_CLE', message: "Aucune donnée sur ce téléphone." };
+      etendreMois(C); // mois ajoutés : enregistrés avec la prochaine écriture (refaits à l'identique d'ici là)
       const avant = JSON.stringify(C);
       let res;
       try { S$.courant = services(C); res = JSON.parse(JSON.stringify(prog.traiter(JSON.parse(JSON.stringify(req))))); }

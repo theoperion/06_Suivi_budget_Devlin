@@ -177,6 +177,7 @@ body.accent .fab{background:var(--acc);color:#fff}body.accent .tab.on{color:var(
 .go:active{transform:scale(.98)}
 .danger{width:100%;height:46px;border-radius:12px;border:1.5px solid var(--bad);color:var(--badInk);font-family:var(--mono);letter-spacing:1px;font-size:13px;margin-top:8px}
 .danger.armed{background:var(--bad);color:#fff}
+:root[data-theme=dark] .danger.armed{color:#1C1B19}
 .mrow{display:flex;justify-content:center;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;letter-spacing:1px;color:var(--ink2)}
 .grp{font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--ink3);margin:10px 0 5px}
 .toast{position:fixed;left:16px;right:16px;margin:0 auto;width:fit-content;max-width:440px;box-sizing:border-box;bottom:calc(92px + var(--safeB));transform:translateY(20px);opacity:0;z-index:30;background:var(--ink);color:var(--paper);border-radius:10px;padding:10px 14px;font-size:13px;line-height:1.35;display:flex;gap:14px;align-items:center;transition:opacity .18s,transform .18s;pointer-events:none}
@@ -897,8 +898,12 @@ function api(action, extra) {
     if (r && r.ok && action !== 'data') planifierSauvegarde();
     // Données du téléphone effacées (navigateur qui libère de la place…) : retour automatique au fichier Google, jamais bloqué.
     if (r && r.error === 'SANS_CLE' && S.mode === 'tel') {
+      const dep = LS.get('telDepuis', null), e = LS.get('svg', null), jour = x => new Date(x).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
       S.mode = 'fichier'; LS.set('mode', 'fichier'); LS.del('telDepuis');
-      setTimeout(() => { try { toastOK("Les données de ce téléphone ont été effacées : l'appli repasse sur ton fichier Google."); } catch (e) {} }, 300);
+      setTimeout(() => { try {
+        if (e) toast('Les dépenses de ce téléphone ont été effacées. Ta sauvegarde Drive du ' + jour(e.le) + ' est plus récente que ton ancien fichier' + (dep ? ' (du ' + jour(dep.le) + ')' : '') + ' : reprends-la.', 'REPRENDRE', () => { ouvrirReglages(); S.form = { mode: 'donnees' }; rendreForm(); }, true);
+        else toastOK("Les dépenses de ce téléphone ont été effacées : l'appli repasse sur ton ancien fichier Google.");
+      } catch (x) {} }, 300);
       return api(action, extra);
     }
     return r;
@@ -2225,7 +2230,7 @@ function sectionsModeEmploi() {
 function rendreModeEmploi() {
   const f = S.form, ouv = f.ouv || [];
   $('#sheetIn').innerHTML = enteteSheet("MODE D'EMPLOI", f.retour || null) + `
-    <div class="note" style="display:block;margin-top:12px">L'appli suit ton budget à partir de ton fichier Google Sheets : tout ce que tu saisis ici y arrive tout seul. Touche un écran ou un thème pour l'ouvrir.</div>
+    <div class="note" style="display:block;margin-top:12px">${S.mode === 'tel' ? 'Tes dépenses sont gardées sur ce téléphone, avec ta sauvegarde dans ton Google Drive (Réglages › Où sont mes données).' : 'L\'appli suit ton budget à partir de ton fichier Google Sheets : tout ce que tu saisis ici y arrive tout seul.'} Touche un écran ou un thème pour l'ouvrir.</div>
     ${sectionsModeEmploi().map(([k, ic, t, sous, L]) => { const o = ouv.includes(k); return `
     <button class="grp regfold" data-act="me-sec" data-k="${k}" aria-expanded="${o}" style="margin-top:16px;font-size:11px;color:var(--ink)"><span>${ic} ${t}</span><span class="muted">${o ? 'MOINS ▴' : 'VOIR ▾'}</span></button>
     <div class="note" style="display:block;margin:4px 0 0">${sous}</div>
@@ -3004,7 +3009,7 @@ function rendreReglages() {
     </div>` : ''}
     <div class="grp" style="margin-top:18px">MON FICHIER ET AIDE</div>
     ${op('go:aide', "📖 Mode d'emploi", 'chaque écran, la saisie, les envois, les défis', 'lire ›')}
-    <button class="opt" data-act="${nq || nr ? 'file' : 'refresh'}"><span>${nq ? 'Envois en attente' : nr ? 'Envois refusés à revoir' : 'Actualiser depuis le fichier'}</span><span class="${nq ? 'c-bad' : 'muted'} mono" style="font-size:12px">${nq ? nq + ' en attente · voir ›' : nr ? 'voir ›' : 'à jour'}</span></button>
+    <button class="opt" data-act="${nq || nr ? 'file' : 'refresh'}"><span>${nq ? 'Envois en attente' : nr ? 'Envois refusés à revoir' : S.mode === 'tel' ? 'Actualiser' : 'Actualiser depuis le fichier'}</span><span class="${nq ? 'c-bad' : 'muted'} mono" style="font-size:12px">${nq ? nq + ' en attente · voir ›' : nr ? 'voir ›' : 'à jour'}</span></button>
     ${S.data.url && S.mode !== 'tel' ? `<a class="opt" href="${esc(S.data.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir mon fichier Google Sheets</span><span class="muted">↗</span></a>` : ''}
     ${TEL_DISPO || S.mode === 'tel' ? op('go:donnees', 'Où sont mes données', S.mode === 'tel' ? 'sur ce téléphone (essai)' : 'dans mon fichier Google', '›') : ''}
     ${S.mode === 'tel' ? '' : op('go:lien', 'Lien de mon script', '', 'modifier ›')}
@@ -5270,54 +5275,68 @@ function resumeDonnees(d) {
   const pm = {}; (d.journal || []).forEach(l => { pm[l.mois] = Math.round(((pm[l.mois] || 0) + Number(l.montant || 0)) * 100) / 100; });
   return JSON.stringify({ n: (d.journal || []).length, pm, cats: (d.categories || []).map(c => [c.nom, c.groupe, c.type, c.budget, c.suivi]),
     ech: (d.echeancier || []).map(e => [e.lib, e.cat, e.montant, e.freq, e.jour, e.pause]), av: (d.avenir || []).map(a => [a.mois, a.lib, a.montant, a.fait]),
-    soldes: d.soldes, ctl: d.controle, debut: d.debut, defis: d.defis, prefs: d.prefs, mois: d.mois, libres: d.libres });
+    soldes: d.soldes, ctl: d.controle, debut: d.debut, defis: d.defis, prefs: d.prefs, libres: d.libres });
 }
+// Les mois du téléphone commencent exactement comme ceux du fichier (le téléphone en ajoute ensuite jusqu'à l'an prochain)
+const moisCompatibles = (f, t) => (f.mois || []).every((m, i) => (t.mois || [])[i] === m);
 const telDepuis = () => LS.get('telDepuis', null);
 function rendreDonnees() {
-  const f = S.form, tel = S.mode === 'tel', dep = telDepuis();
-  let h = enteteSheet('RÉGLAGES', 'reglages');
-  if (!tel) h += `<div class="grp" style="margin-top:14px">OÙ SONT MES DONNÉES</div>
-    <div class="note" style="display:block">Aujourd'hui, tes dépenses sont dans <b>ton fichier Google Sheets</b> : l'appli passe par ton script pour les lire et les écrire.</div>
-    <div class="note" style="display:block;margin-top:8px">Sur <b>ce téléphone</b>, elles sont gardées dans le téléphone : plus de script, tout est instantané, même sans réseau. Ton fichier Google ne bouge plus : il reste tel qu'au jour du passage, comme filet de sécurité, et tu peux y revenir à tout moment.</div>
-    <div class="note" style="display:block;margin-top:8px">⚠ <b>Essai</b> : juste après le passage, active la <b>sauvegarde dans ton Drive</b> (un Google Sheet mis à jour tout seul). Sans elle, ce que tu saisis ensuite n'existe que sur ce téléphone.</div>
+  const f = S.form, tel = S.mode === 'tel', dep = telDepuis(), e = LS.get('svg', null);
+  sauvegardeTel().then(sv => sv.precharger()).catch(() => {}); // fenêtre Google prête au moment du toucher
+  let h = enteteSheet('RÉGLAGES', 'reglages') + `<div class="grp" style="margin-top:14px">OÙ SONT MES DONNÉES</div>`;
+  if (!tel) h += `<div class="note" style="display:block">Aujourd'hui, tes dépenses sont dans <b>ton fichier Google Sheets</b>, que l'appli lit et écrit.</div>
+    <div class="note" style="display:block;margin-top:8px">Si tu passes sur <b>ce téléphone</b> : tes dépenses seront gardées dans le téléphone. Tout devient instantané, même sans réseau, et <b>ta sauvegarde</b> est créée dans ton Google Drive.</div>
+    <div class="note" style="display:block;margin-top:8px">Ton fichier actuel ne bougera plus : il restera tel quel, comme filet de sécurité (<b>ton ancien fichier</b>). Tu pourras y revenir.</div>
+    <div class="note" style="display:block;margin-top:8px">Google va te demander ton compte puis ton accord, et affichera peut-être « Google n'a pas validé cette appli » : c'est normal pendant l'essai, touche « Continuer ».</div>
     <div class="err" id="ferr"></div><button class="go" data-act="donnees-tel">PASSER SUR CE TÉLÉPHONE</button>
     <div class="grp" style="margin-top:22px">NOUVEAU TÉLÉPHONE</div>
-    <div class="note" style="display:block">Tu étais déjà sur un téléphone avec une sauvegarde dans ton Drive ? Reprends-la ici.</div>
-    <button class="ghost" data-act="drive-restaurer" style="margin-top:8px">${f.armR ? 'TOUCHE ENCORE : REPRENDRE LA SAUVEGARDE DU ' + esc(f.armR) : 'REPRENDRE MA SAUVEGARDE DU DRIVE'}</button>`;
-  else h += `<div class="grp" style="margin-top:14px">OÙ SONT MES DONNÉES</div>
-    <div class="note" style="display:block">Tes données sont <b>sur ce téléphone</b>${dep ? ' depuis le ' + esc(new Date(dep.le).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })) : ''} · <span id="telrev">…</span></div>
-    <div class="grp" style="margin-top:18px">SAUVEGARDE DANS TON DRIVE</div>
-    ${(() => { const e = LS.get('svg', null);
-      if (!e) return `<div class="note" style="display:block">⚠ <b>Pas encore activée</b> : si ce téléphone est perdu ou effacé, ce que tu as saisi ici serait perdu. Active-la : un Google Sheet « Jauge · sauvegarde » sera créé dans ton Drive et mis à jour tout seul.</div>
-        <button class="go" data-act="drive-connecter" style="margin-top:8px">ACTIVER LA SAUVEGARDE DRIVE</button>`;
+    <div class="note" style="display:block">Tu étais déjà sur un téléphone avec ta sauvegarde dans ton Drive ? Reprends-la ici.</div>
+    <button class="ghost" data-act="drive-restaurer" style="margin-top:8px">${f.armR ? 'TOUCHE ENCORE : REPRENDRE TA SAUVEGARDE DU ' + esc(f.armR) : 'REPRENDRE MA SAUVEGARDE DU DRIVE'}</button>`;
+  else {
+    h += `<div class="note" style="display:block">Tes dépenses sont <b>sur ce téléphone</b>${dep ? ' depuis le ' + esc(new Date(dep.le).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })) : ''}.</div>
+      <div class="grp" style="margin-top:18px">TA SAUVEGARDE (GOOGLE DRIVE)</div>`;
+    if (!e) h += `<div class="note" style="display:block">⚠ <b>Pas encore de sauvegarde</b> : si ce téléphone est perdu ou effacé, tes dépenses seraient perdues. Touche le bouton : ta sauvegarde est créée dans ton Drive.</div>
+      <div class="err" id="ferr"></div><button class="go" data-act="drive-connecter" style="margin-top:8px">CRÉER MA SAUVEGARDE</button>`;
+    else {
       const quand = new Date(e.le).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-      return `<div class="note" style="display:block">Dernière sauvegarde : <b>${esc(quand)}</b> · <span id="svgEtat">…</span>${S.svgMsg ? '<br><span class="c-bad">' + esc(S.svgMsg) + '</span>' : ''}</div>
-        ${e.sheetUrl ? `<a class="opt" href="${esc(e.sheetUrl)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir la sauvegarde (Google Sheets)</span><span class="muted">↗</span></a>` : ''}
-        <button class="ghost" data-act="drive-sauver" style="margin-top:8px">SAUVEGARDER MAINTENANT</button>`; })()}
-    <div class="note" style="display:block;margin-top:14px">Ton fichier Google d'avant est resté tel qu'au jour du passage. Si tu y reviens, les changements faits ici depuis n'y seront pas.</div>
-    <div class="err" id="ferr"></div><button class="danger ${f.arm ? 'armed' : ''}" data-act="donnees-fichier" style="margin-top:14px">${f.arm ? 'TOUCHE ENCORE : RETOUR AU FICHIER (sans les changements faits ici)' : 'REVENIR À MON FICHIER GOOGLE'}</button>`;
+      h += `<div class="note" style="display:block">Dernière sauvegarde : <b>${esc(quand)}</b> · <span id="svgEtat">…</span></div>
+        ${S.svgMsg ? `<div class="note" style="display:block;margin-top:6px"><b>La sauvegarde automatique est en pause</b> : touche SAUVEGARDER MAINTENANT pour la relancer.</div>` : ''}
+        <div class="err" id="ferr"></div><button class="go" data-act="drive-sauver" style="margin-top:8px">SAUVEGARDER MAINTENANT</button>
+        ${e.sheetUrl ? `<a class="opt" href="${esc(e.sheetUrl)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir ma sauvegarde (Google Sheets)</span><span class="muted">↗</span></a>` : ''}
+        <div class="note" style="display:block;margin-top:8px">Après chaque SAUVEGARDER, tes changements suivants sont sauvegardés tout seuls pendant 1 heure. Pendant l'essai, Google redemandera ton accord environ une fois par semaine : c'est normal.</div>`;
+    }
+    h += `<div class="grp" style="margin-top:18px">TON ANCIEN FICHIER</div>
+      <div class="note" style="display:block">Il est resté tel qu'au jour du passage. Si tu y reviens, les dépenses saisies sur ce téléphone depuis n'y seront pas.</div>
+      <button class="danger ${f.arm ? 'armed' : ''}" data-act="donnees-fichier" style="margin-top:10px">${f.arm ? 'TOUCHE ENCORE : RETOUR À L\'ANCIEN FICHIER (sans les dépenses saisies ici)' : 'REVENIR À MON ANCIEN FICHIER'}</button>`;
+  }
   $('#sheetIn').innerHTML = h;
-  if (tel) moteurTel().then(async m => { await m.appel({ action: 'data', key: S.key }).catch(() => {}); const z = $('#telrev'), n = m.revision() - ((dep && dep.rev) || 0); if (z) z.textContent = n > 0 ? n + ' changement' + (n > 1 ? 's' : '') + ' depuis' : 'aucun changement depuis';
-    const e = LS.get('svg', null), w = $('#svgEtat'); if (w && e) { const k = m.revision() - (e.rev || 0); w.textContent = k > 0 ? k + ' changement' + (k > 1 ? 's' : '') + ' à sauvegarder' : 'à jour ✓'; } }).catch(() => {});
+  if (tel && e) moteurTel().then(async m => { await m.appel({ action: 'data', key: S.key }).catch(() => {});
+    const w = $('#svgEtat'), k = m.revision() - (e.rev || 0); if (w) w.textContent = k > 0 ? k + ' changement' + (k > 1 ? 's' : '') + ' pas encore sauvegardé' + (k > 1 ? 's' : '') : 'à jour ✓'; }).catch(() => {});
 }
-async function passerTelephone() {
+// Passage sur le téléphone, dans cet ordre : 1) accord Google (le toucher sert de geste) 2) copie du fichier dans le téléphone,
+// vérifiée 3) première sauvegarde dans le Drive. On ne bascule qu'une fois les trois réussis : sinon rien ne change.
+async function passerTelephone(opt) {
   const dire = x => { const z = $('#ferr'); if (z) z.textContent = x; };
   if (S.mode === 'tel' || S.busy) return;
   if (S.queue.length) return dire("Il reste des envois en attente : attends qu'ils partent dans ton fichier (Réglages › Envois en attente), puis recommence.");
-  dire('Copie de ton fichier sur ce téléphone…'); S.busy = true;
   try {
+    const sv = await sauvegardeTel();
+    if (!sv.connecte()) { dire('Connexion à Google…'); await sv.connecter(true); }
+    dire('Copie de ton fichier sur ce téléphone…'); S.busy = true;
     const r = await api('data'); if (!r || !r.ok || !r.data) throw new Error((r && r.message) || 'fichier illisible');
     // Une saisie faite pendant la copie (ou la fenêtre fermée) : on annule, rien n'est perdu, il suffit de recommencer.
     const interrompu = () => S.queue.length || !S.form || S.form.mode !== 'donnees';
     if (interrompu()) throw new Error('une saisie a été faite pendant la copie, recommence');
     const m = await moteurTel(); await m.importer(r.data, S.key);
     const r2 = await m.appel({ action: 'data', key: S.key });
-    if (!r2 || !r2.ok || resumeDonnees(r2.data) !== resumeDonnees(r.data)) throw new Error('la copie ne correspond pas exactement à ton fichier');
+    if (!r2 || !r2.ok || resumeDonnees(r2.data) !== resumeDonnees(r.data) || !moisCompatibles(r.data, r2.data)) throw new Error('la copie ne correspond pas exactement à ton fichier');
+    dire('Création de ta sauvegarde dans ton Drive…');
+    LS.del('svg'); await sv.sauver();
     if (interrompu()) throw new Error('une saisie a été faite pendant la copie, recommence');
     S.mode = 'tel'; LS.set('mode', 'tel'); LS.set('telDepuis', { le: new Date().toISOString(), rev: m.revision() });
     S.data = prepData(r2.data); S.journal = entriesFromData(r2.data); S.lastFetch = Date.now(); S.actualise = true; sauver();
     S.busy = false; fermer(); rendre(true);
-    toastOK('Tes données sont maintenant sur ce téléphone. Ton fichier Google reste tel quel, comme filet de sécurité.');
+    toastOK('Tes dépenses sont maintenant sur ce téléphone, et sauvegardées dans ton Drive ✓');
   } catch (e) { S.busy = false; dire("Passage annulé, rien n'a changé : " + (e && e.message || e)); if (S.queue.length) pomper(); } // une saisie faite pendant la copie part tout de suite au fichier
 }
 // Sauvegarde Drive à la demande (le toucher sert de « geste » : Google peut ouvrir sa fenêtre de connexion).
@@ -5328,7 +5347,7 @@ async function sauverDrive(premiere) {
     if (!sv.connecte()) { dire('Connexion à Google…'); await sv.connecter(premiere || !LS.get('svg', null)); }
     dire('Sauvegarde en cours…'); await sv.sauver(); S.svgMsg = '';
     if (S.form && S.form.mode === 'donnees') rendreForm();
-    toast('Sauvegardé dans ton Drive ✓');
+    toast('Sauvegardé dans ton Drive ✓ (et tout seul pendant 1 h)');
   } catch (e) { dire('Sauvegarde pas faite : ' + (e && e.message || e)); }
 }
 // Nouveau téléphone : reprendre la dernière sauvegarde du Drive (2 touchers : on montre d'abord sa date)
@@ -5340,12 +5359,12 @@ async function restaurerDrive() {
     if (!sv.connecte()) { dire('Connexion à Google…'); await sv.connecter(true); }
     dire('Recherche de ta sauvegarde…');
     const d = await sv.lireDrive();
-    if (!d) return dire('Aucune sauvegarde de Jauge trouvée dans ce compte Google.');
+    if (!d) return dire('Aucune sauvegarde de l\'appli trouvée dans ce compte Google.');
     if (!f.armR || f.idR !== d.id) { f.armR = new Date(d.sauve).toLocaleString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).toUpperCase(); f.idR = d.id; rendreForm(); return; }
     const m = await moteurTel(); await m.restaurer(d.classeur, S.key);
     const r = await m.appel({ action: 'data', key: S.key }); if (!r || !r.ok) throw new Error((r && r.message) || 'sauvegarde illisible');
     S.mode = 'tel'; LS.set('mode', 'tel'); LS.set('telDepuis', { le: new Date().toISOString(), rev: m.revision() });
-    LS.set('svg', Object.assign({}, LS.get('svg', {}) || {}, { json: d.id, le: d.sauve, rev: m.revision() }));
+    LS.set('svg', { json: d.id, le: d.sauve, rev: m.revision(), sheet: d.sheet || null, sheetUrl: d.sheetUrl || null, ids: d.ids || {}, lignes: d.lignes || {} }); // même Sheet de sauvegarde qu'avant (pas un 2e)
     S.data = prepData(r.data); S.journal = entriesFromData(r.data); S.lastFetch = Date.now(); S.actualise = true; sauver();
     fermer(); rendre(true); toastOK('Sauvegarde reprise : tes données sont sur ce téléphone.');
   } catch (e) { dire('Pas repris : ' + (e && e.message || e)); }
@@ -5920,7 +5939,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) { co
 if (S.mode === 'tel') setTimeout(() => moteurTel().then(m => {
   const e = LS.get('svg', null), j = 86400000, vu = LS.get('svgRappel', 0);
   if (Date.now() - vu < j / 2) return;
-  if (!e) { LS.set('svgRappel', Date.now()); toast('Tes données sont seulement sur ce téléphone : active la sauvegarde Drive', 'ACTIVER', () => { ouvrirReglages(); S.form = { mode: 'donnees' }; rendreForm(); }); }
+  if (!e) { LS.set('svgRappel', Date.now()); toast('Tes dépenses sont seulement sur ce téléphone : crée ta sauvegarde Drive', 'CRÉER', () => { ouvrirReglages(); S.form = { mode: 'donnees' }; rendreForm(); }); }
   else if (m.revision() !== e.rev && Date.now() - new Date(e.le).getTime() > j) { LS.set('svgRappel', Date.now()); toast('Dernière sauvegarde Drive il y a plus d\'un jour', 'SAUVEGARDER', () => sauverDrive(false)); }
 }).catch(() => {}), 4000);
 if (!S.key || !S.api) verrouiller(); else { rendre(); rafraichir(true); pomper(); if (/[?&]saisie=1/.test(location.search)) { ouvrirSaisie(null); try { history.replaceState(history.state, '', location.pathname); } catch (e) {} } }
