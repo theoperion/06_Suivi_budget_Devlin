@@ -1,59 +1,23 @@
 /**
- * BUDGET · API du budget de Devlin (Apps Script) · v5.14
+ * BUDGET · API du budget de Devlin (Apps Script) · v5.15
  * ------------------------------------------
- * Ce script est relié au fichier budget dans lequel il a été créé.
- * Il lit les Paramètres, l'Échéancier et le Journal, et écrit dans le Journal.
- * Toutes les demandes doivent contenir la clé d'accès.
+ * Relié au fichier budget qui le contient : lit Paramètres, Échéancier, Journal et « À venir », et y écrit
+ * ce que l'appli envoie. Chaque demande doit contenir la clé (menu Budget › Choisir ma clé).
+ * Points clés : envois rejouables sans doublon après une coupure (uid gardé 30 jours, propriété UIDS) ;
+ * plusieurs envois en un « lot » sous un seul verrou ; fichier occupé → OCCUPE (l'appli réessaie) ;
+ * onglet caché « Diagnostic » (une ligne par demande) ; libellés écrits en texte brut.
+ * Colonne « Payé en » du Journal : « Espèces » ou « En ligne ». Préférences de l'appli gardées dans les propriétés du script.
  *
- * v5.0 : plus aucun lien avec le fichier « Portefeuille & Épargne ».
- *        Un retrait de livret se saisit comme un revenu (ex. « Autres revenus », libellé « Retrait livret A »).
- * v5.1 : anti-doublon sur les ajouts (« payé pour d'autres » qui s'enregistrait deux fois).
- * v5.2 : la date de la dépense (colonne « Saisi le ») se modifie aussi quand on corrige une ligne.
- * v5.3 : fonction verifier() pour donner les autorisations et tester le script en un clic.
- * v5.6 : « À venir » : le mois est écrit en texte (corrige l'échec des éléments à venir).
- * v5.14 : envois rejoués sans risque après une coupure : chaque ajout, suppression, ligne d'Échéancier ou d'« À venir »
- *         porte un identifiant (uid) gardé 30 jours (propriété UIDS, plus seulement 6 h) ; une suppression déjà faite
- *         n'efface plus une 2e ligne identique ; une modification déjà faite répond « ok » ; libellé écrit en texte
- *         (cellule au format « Texte brut » : « =… », « 1,20 », « 12/11 » ne sont plus transformés par Sheets) ;
- *         la mémoire UIDS n'est écrite qu'une fois par demande (un lot de 20 envois = 1 écriture).
- * v5.13 : une fois, les catégories « Courses » passent en suivi « Sans alerte ».
- * v5.12 : préférence « envies » (liste d'envies) ; colonne « Payé en » accepte aussi « En ligne ».
- * v5.11 : action « lot » : plusieurs envois en une demande (un seul verrou) ; un envoi refusé n'empêche pas les suivants.
- * v5.10 : « À venir » accepte un mois futur pas encore présent dans la liste du Journal.
- * v5.9 : renommer une catégorie met aussi à jour le défi du mois ; on ne peut plus retirer une catégorie encore utilisée dans « À venir ».
- * v5.8 : classeur ouvert une seule fois par demande ; onglet caché « Diagnostic » (durée et résultat de chaque demande).
- * v5.7 : fichier occupé → réponse OCCUPE (l'appli réessaie) au lieu d'une erreur qui faisait perdre la saisie.
- * v5.5 : chaque appel est noté dans Apps Script › Exécutions (action, résultat, erreur) pour diagnostiquer.
- * v5.4 : la colonne « Contrôle » du Journal ignore les lignes validées « c'est voulu » (libellé terminé par ✓). Mise à jour automatique, une seule fois.
- * Espèces : colonne « Payé en » du Journal (N par défaut) = « Espèces » pour une dépense payée en liquide ;
- *           préférence « especes » = espèces déclarées au dernier contrôle + retraits au distributeur depuis.
- * Achat en ligne : même colonne « Payé en » = « En ligne » (exclusif avec « Espèces ») ; relu en enLigne: true.
- * Achats plaisir : préférence « envies » = liste d'envies avec délai + réglages (taux horaire, seuil, enveloppe).
+ * Installation : menu Budget › Choisir ma clé, puis Déployer › Nouveau déploiement › Application Web
+ * (Exécuter en tant que : moi · Accès : tout le monde). Historique détaillé : git du dépôt 02_Suivi_budget_moi.
  *
- * Installation :
- *  1. Remplace CLE_A_ENREGISTRER par ta clé, lance initialiserCle() une fois (inutile si c'est déjà fait).
- *  2. Déployer > Gérer les déploiements > crayon > Nouvelle version > Déployer
- *     (Exécuter en tant que : moi · Accès : tout le monde).
- */
-
-/**
  * @OnlyCurrentDoc
- * (24/11/2026) Le script ne demande l'accès qu'au fichier qui le contient, rien d'autre du Drive : plus sûr,
- * et l'écran d'autorisation de Google est plus court. Le fichier doit donc contenir le script (ID_FICHIER vide).
+ * Le script ne demande l'accès qu'au fichier qui le contient, rien d'autre du Drive.
  */
-const CLE_A_ENREGISTRER = 'CHANGE-MOI';
-const VERSION_API = '5.14';
+const VERSION_API = '5.15';
 
-// Laisse vide si le script est ouvert depuis le fichier (Extensions > Apps Script).
+// Vide : le script est dans le fichier (Extensions › Apps Script). Rempli seulement pour un script séparé.
 const ID_FICHIER = '1TFXRVMLuVv_NauUH7VyJ4Pgd-Us5JuD3_3lzN_ojfvQ'; // fichier budget de Devlin
-
-function initialiserCle() {
-  if (!CLE_A_ENREGISTRER || CLE_A_ENREGISTRER === 'CHANGE-MOI') {
-    throw new Error('Remplace d\'abord CHANGE-MOI par ta clé (ligne 17).');
-  }
-  PropertiesService.getScriptProperties().setProperty('APP_KEY', CLE_A_ENREGISTRER);
-  Logger.log('Clé enregistrée. Tu peux remettre CHANGE-MOI à la ligne 17.');
-}
 
 // Menu « Budget » dans le fichier (installation d'une nouvelle personne, 24/11/2026) : choisir sa clé sans toucher au code.
 function onOpen() {
@@ -76,12 +40,10 @@ function verifier() {
   const ss = classeur_();
   ['Paramètres', 'Journal', 'Échéancier', 'À venir'].forEach(n => { if (!ss.getSheetByName(n)) throw new Error('Onglet introuvable : ' + n); });
   CacheService.getScriptCache().put('test', '1', 60);
-  PropertiesService.getScriptProperties().deleteProperty('FORMULE_L4_V'); majFormules_(ss);
-  Logger.log('Formule Contrôle (L4) : ' + (ss.getSheetByName('Journal').getRange('L4').getFormula().indexOf('✓') >= 0 ? 'à jour ✓' : 'NON MODIFIÉE (préviens Claude)'));
   LockService.getScriptLock().waitLock(5000); LockService.getScriptLock().releaseLock();
   const cle = PropertiesService.getScriptProperties().getProperty('APP_KEY');
   const d = lireDonnees_();
-  Logger.log('✓ Script ' + VERSION_API + ' relié à « ' + ss.getName() + ' » · ' + d.categories.length + ' catégories · ' + d.journal.length + ' lignes de Journal · clé ' + (cle ? 'enregistrée ✓' : 'MANQUANTE : lance initialiserCle()'));
+  Logger.log('✓ Script ' + VERSION_API + ' relié à « ' + ss.getName() + ' » · ' + d.categories.length + ' catégories · ' + d.journal.length + ' lignes de Journal · clé ' + (cle ? 'enregistrée ✓' : 'MANQUANTE : menu Budget › Choisir ma clé'));
 }
 
 /* ---------- Points d'entrée ---------- */
@@ -109,18 +71,9 @@ function doPost(e) {
   return ContentService.createTextOutput(txt).setMimeType(ContentService.MimeType.JSON);
 }
 
-// Appelée par l'interface quand elle tourne directement dans Apps Script.
-function api(texte) {
-  try {
-    return JSON.stringify(traiter_(JSON.parse(texte)));
-  } catch (err) {
-    return JSON.stringify({ ok: false, error: 'SERVEUR', message: String(err && err.message || err) });
-  }
-}
-
 function traiter_(req) {
   const cle = PropertiesService.getScriptProperties().getProperty('APP_KEY');
-  if (!cle) return { ok: false, error: 'SANS_CLE', message: 'Clé non configurée : lance initialiserCle() dans Apps Script.' };
+  if (!cle) return { ok: false, error: 'SANS_CLE', message: 'Clé non configurée : dans ton fichier, menu Budget › Choisir ma clé.' };
   if (!req || req.key !== cle) return { ok: false, error: 'CLE', message: 'Clé incorrecte.' };
 
   if (req.action === 'data') return { ok: true, data: lireDonnees_() };
@@ -192,22 +145,8 @@ function diagnostic_(action, ms, out) {
   } catch (e) { /* le diagnostic ne doit jamais bloquer un envoi */ }
 }
 
-// Une seule fois (v5.13) : les courses passent en suivi « Sans alerte » (dépense essentielle, montant variable, hors défis).
-function migrerCoursesSansAlerte_(ss) {
-  const p = PropertiesService.getScriptProperties();
-  if (p.getProperty('MIGR_COURSES') === '1') return;
-  try {
-    const par = ss.getSheetByName('Paramètres'), r = par.getRange('A10:E40'), v = r.getValues(); let n = 0;
-    v.forEach((row, i) => { if (/\bcourses?\b/i.test(String(row[0])) && String(row[4]).trim() !== 'Sans alerte') { par.getRange(10 + i, 5).setValue('Sans alerte'); n++; } });
-    p.setProperty('MIGR_COURSES', '1');
-    console.log('Courses en « Sans alerte » : ' + n + ' catégorie(s)');
-  } catch (e) { /* on réessaiera au prochain chargement */ }
-}
-
 function lireDonnees_() {
   const ss = classeur_();
-  majFormules_(ss);
-  migrerCoursesSansAlerte_(ss);
   const par = ss.getSheetByName('Paramètres');
   const ech = ss.getSheetByName('Échéancier');
   const jou = ss.getSheetByName('Journal');
@@ -279,22 +218,6 @@ function lireDonnees_() {
     anomalies: jou.getRange('A3').getDisplayValue(),
     lu: new Date().toISOString()
   };
-}
-
-// Colonne « Contrôle » du Journal (L4) : une ligne dont le libellé finit par ✓ n'est plus signalée « déjà dans l'Échéancier ? ».
-// Corrige la formule une seule fois, sans rien toucher d'autre.
-function majFormules_(ss) {
-  const p = PropertiesService.getScriptProperties();
-  if (p.getProperty('FORMULE_L4_V') === '1') return;
-  try {
-    const c = (ss || classeur_()).getSheetByName('Journal').getRange('L4'), f = c.getFormula();
-    let ok = !f || f.indexOf('✓') >= 0;
-    if (!ok) {
-      const g = f.replace(/IF\(\(A5:A=""\)\+\(cnt=0\)\s*,/, 'IF((A5:A="")+(cnt=0)+REGEXMATCH(B5:B&"","✓\\s*$"),');
-      if (g !== f) { c.setFormula(g); ok = true; }
-    }
-    if (ok) p.setProperty('FORMULE_L4_V', '1');
-  } catch (e) { /* on réessaiera au prochain chargement */ }
 }
 
 function num_(v) { return typeof v === 'number' ? v : (v === '' || v === null ? null : (Number(v) || null)); }
@@ -479,12 +402,10 @@ function ajouter_(l) {
   const err = valider_(l);
   if (err) return { ok: false, error: 'INVALIDE', message: err };
   // Anti-doublon : si le téléphone renvoie un ajout déjà écrit (réseau coupé avant la réponse), on ne l'écrit pas deux fois.
-  // v5.14 : mémoire durable (UIDS, 30 jours) ; l'ancienne mémoire de 6 h (CacheService) reste lue pour les envois d'avant.
+  // Mémoire durable (UIDS, 30 jours).
   const jou = classeur_().getSheetByName('Journal');
   const cleUid = cleUid_('add', l.uid), vu = uidVu_(cleUid);
-  let ancien = null;
-  if (!vu && l.uid) { try { ancien = CacheService.getScriptCache().get('add_' + String(l.uid).slice(0, 40)); } catch (e) {} }
-  if (vu || ancien) return { ok: true, row: ligneRetrouvee_(jou, vu ? vu[0] : Number(ancien), l), deja: true };
+  if (vu) return { ok: true, row: ligneRetrouvee_(jou, vu[0], l), deja: true };
   const vals = jou.getRange(5, 1, nbLignesJournal_(jou), 4).getValues();
   let dernier = -1;
   for (let i = vals.length - 1; i >= 0; i--) {

@@ -234,7 +234,7 @@
     ech.n = Math.max(ligneMax(data.echeancier || [], 'ligne', 4) + 30, 60);
     (data.avenir || []).forEach(a => { [a.mois, a.lib, a.cat, a.montant, a.fait === true, a.jour == null ? '' : a.jour].forEach((x, j) => met(av, a.row, j + 1, x)); });
     av.n = Math.max(ligneMax(data.avenir || [], 'row', 3) + 30, 40);
-    const props = { APP_KEY: cle, MIGR_COURSES: '1', FORMULE_L4_V: '1', DEFIS: JSON.stringify(data.defis || {}) };
+    const props = { APP_KEY: cle, DEFIS: JSON.stringify(data.defis || {}) };
     Object.keys(data.prefs || {}).forEach(k => { props['PREF_' + k] = JSON.stringify(data.prefs[k]); });
     return { format: 1, onglets: { 'Paramètres': par, 'Journal': jou, 'Échéancier': ech, 'À venir': av }, props, debut: data.debut || null, rev: 1, cree: new Date().toISOString() };
   }
