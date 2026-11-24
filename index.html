@@ -5303,7 +5303,7 @@ function rendreDonnees() {
         ${S.svgMsg ? `<div class="note" style="display:block;margin-top:6px"><b>La sauvegarde automatique est en pause</b> : touche SAUVEGARDER MAINTENANT pour la relancer.</div>` : ''}
         <div class="err" id="ferr"></div><button class="go" data-act="drive-sauver" style="margin-top:8px">SAUVEGARDER MAINTENANT</button>
         ${e.sheetUrl ? `<a class="opt" href="${esc(e.sheetUrl)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir ma sauvegarde (Google Sheets)</span><span class="muted">↗</span></a>` : ''}
-        <div class="note" style="display:block;margin-top:8px">Après chaque SAUVEGARDER, tes changements suivants sont sauvegardés tout seuls pendant 1 heure. Pendant l'essai, Google redemandera ton accord environ une fois par semaine : c'est normal.</div>`;
+        <div class="note" style="display:block;margin-top:8px">La sauvegarde se fait toute seule pendant 1 heure après chaque SAUVEGARDER MAINTENANT. Ensuite, touche ce bouton quand tu as saisi des dépenses (l'appli te le rappelle). Pendant l'essai, Google redemandera ton accord environ une fois par semaine : c'est normal.</div>`;
     }
     h += `<div class="grp" style="margin-top:18px">TON ANCIEN FICHIER</div>
       <div class="note" style="display:block">Il est resté tel qu'au jour du passage. Si tu y reviens, les dépenses saisies sur ce téléphone depuis n'y seront pas.</div>
@@ -5893,7 +5893,7 @@ document.addEventListener('click', ev => {
       S.queue.splice(i, 1); const e = trouver(o.id); if (e && !S.queue.some(q => q.id === e.id)) e.pending = false; sauver(); S.form.arm = false; rendreFile(); rendre(true); toast('Envoi abandonné : à ressaisir si besoin'); pomper(); } break;
     case 'logout': if (!S.form.armOut) { S.form.armOut = true; rendreReglages(); } else { fermer(); oublierCompte(); rendre(); verrouiller(); } break;
     case 'go:lien': S.form = { mode: 'lien', url: S.api }; rendreForm(); break;
-    case 'go:donnees': S.form = { mode: 'donnees' }; rendreForm(); break;
+    case 'go:donnees': if (toastGarde) { toastGarde = null; $('#toast').classList.remove('on'); } S.form = { mode: 'donnees' }; rendreForm(); break;
     case 'donnees-tel': passerTelephone(); break;
     case 'drive-connecter': case 'drive-sauver': sauverDrive(a === 'drive-connecter'); break;
     case 'drive-restaurer': restaurerDrive(); break;
@@ -5940,7 +5940,7 @@ if (S.mode === 'tel') setTimeout(() => moteurTel().then(m => {
   const e = LS.get('svg', null), j = 86400000, vu = LS.get('svgRappel', 0);
   if (Date.now() - vu < j / 2) return;
   if (!e) { LS.set('svgRappel', Date.now()); toast('Tes dépenses sont seulement sur ce téléphone : crée ta sauvegarde Drive', 'CRÉER', () => { ouvrirReglages(); S.form = { mode: 'donnees' }; rendreForm(); }); }
-  else if (m.revision() !== e.rev && Date.now() - new Date(e.le).getTime() > j) { LS.set('svgRappel', Date.now()); toast('Dernière sauvegarde Drive il y a plus d\'un jour', 'SAUVEGARDER', () => sauverDrive(false)); }
+  else if (m.revision() !== e.rev && Date.now() - new Date(e.le).getTime() > j / 2) { LS.set('svgRappel', Date.now()); toast('Des dépenses ne sont pas encore dans ta sauvegarde Drive', 'SAUVEGARDER', () => sauverDrive(false)); }
 }).catch(() => {}), 4000);
 if (!S.key || !S.api) verrouiller(); else { rendre(); rafraichir(true); pomper(); if (/[?&]saisie=1/.test(location.search)) { ouvrirSaisie(null); try { history.replaceState(history.state, '', location.pathname); } catch (e) {} } }
 // (9.27) Mises à jour automatiques : quand une nouvelle version est installée, l'appli se recharge d'elle-même
