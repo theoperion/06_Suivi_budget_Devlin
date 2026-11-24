@@ -875,7 +875,15 @@ function moteurTel() {
   }));
 }
 function api(action, extra) {
-  if (S.mode === 'tel') return moteurTel().then(m => m.appel(Object.assign({ action, key: S.key }, extra || {})));
+  if (S.mode === 'tel') return moteurTel().then(m => m.appel(Object.assign({ action, key: S.key }, extra || {}))).then(r => {
+    // Données du téléphone effacées (navigateur qui libère de la place…) : retour automatique au fichier Google, jamais bloqué.
+    if (r && r.error === 'SANS_CLE' && S.mode === 'tel') {
+      S.mode = 'fichier'; LS.set('mode', 'fichier'); LS.del('telDepuis');
+      setTimeout(() => { try { toastOK("Les données de ce téléphone ont été effacées : l'appli repasse sur ton fichier Google."); } catch (e) {} }, 300);
+      return api(action, extra);
+    }
+    return r;
+  });
   const body = JSON.stringify(Object.assign({ action, key: S.key }, extra || {}));
   return fetch(S.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow' })
     .then(async r => { const t = await r.text(); if (!r.ok) throw new Error('HTTP ' + r.status + ' · ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120));
@@ -5182,8 +5190,8 @@ function statsMois(y, m) {
 /* ================= VERROU ================= */
 const URL_OK = u => /^https:\/\/script\.google\.com\/(a\/[^/]+\/)?macros\/s\/[\w-]+\/exec\/?$/.test(u);
 function oublierCompte() {
-  ['key', 'api', 'cache', 'queue', 'rejets', 'ordre', 'pins', 'usage', 'controles', 'bilanVu', 'derDep', 'serieDepuis', 'recordSans', 'jeuVus', 'skin', 'accent', 'nivVu', 'prestVu', 'xpVu', 'cosmVus', 'alertesVues', 'anticipe', 'cos_theme', 'cos_mascotte', 'cos_tampon', 'cos_police', 'cos_fete', 'cos_son', 'cos_aiguille', 'cos_ticket', 'cos_titre', 'pref_tirelires', 'pref_voyages', 'pref_escalier', 'pref_semaines', 'pref_objectifs', 'cos_ui', 'cos_texte', 'progT', 'debloques', 'resumeVu', 'pref_jeu', 'cos_ambiance', 'xpDetail', 'xpLog', 'cosmDf', 'evVus', 'evGagnes', 'evBanCaches', 'anomMasquees', 'rappelsVus', 'ctrlFait'].forEach(k => LS.del(k));
-  Object.assign(S, { key: '', api: '', data: null, journal: [], queue: [], lastBig: null, lastFrac: 0 });
+  ['key', 'api', 'cache', 'queue', 'rejets', 'ordre', 'pins', 'usage', 'controles', 'bilanVu', 'derDep', 'serieDepuis', 'recordSans', 'jeuVus', 'skin', 'accent', 'nivVu', 'prestVu', 'xpVu', 'cosmVus', 'alertesVues', 'anticipe', 'cos_theme', 'cos_mascotte', 'cos_tampon', 'cos_police', 'cos_fete', 'cos_son', 'cos_aiguille', 'cos_ticket', 'cos_titre', 'pref_tirelires', 'pref_voyages', 'pref_escalier', 'pref_semaines', 'pref_objectifs', 'cos_ui', 'cos_texte', 'progT', 'debloques', 'resumeVu', 'pref_jeu', 'cos_ambiance', 'xpDetail', 'xpLog', 'cosmDf', 'evVus', 'evGagnes', 'evBanCaches', 'anomMasquees', 'rappelsVus', 'ctrlFait', 'mode', 'telDepuis'].forEach(k => LS.del(k));
+  Object.assign(S, { key: '', api: '', data: null, journal: [], queue: [], lastBig: null, lastFrac: 0, mode: 'fichier' });
 }
 // Écran de connexion : chacun branche SON script et SA clé. Rien n'est stocké ailleurs que sur ce téléphone.
 function verrouiller(msg) {
@@ -5268,14 +5276,18 @@ async function passerTelephone() {
   dire('Copie de ton fichier sur ce téléphone…'); S.busy = true;
   try {
     const r = await api('data'); if (!r || !r.ok || !r.data) throw new Error((r && r.message) || 'fichier illisible');
+    // Une saisie faite pendant la copie (ou la fenêtre fermée) : on annule, rien n'est perdu, il suffit de recommencer.
+    const interrompu = () => S.queue.length || !S.form || S.form.mode !== 'donnees';
+    if (interrompu()) throw new Error('une saisie a été faite pendant la copie, recommence');
     const m = await moteurTel(); await m.importer(r.data, S.key);
     const r2 = await m.appel({ action: 'data', key: S.key });
     if (!r2 || !r2.ok || resumeDonnees(r2.data) !== resumeDonnees(r.data)) throw new Error('la copie ne correspond pas exactement à ton fichier');
+    if (interrompu()) throw new Error('une saisie a été faite pendant la copie, recommence');
     S.mode = 'tel'; LS.set('mode', 'tel'); LS.set('telDepuis', { le: new Date().toISOString(), rev: m.revision() });
     S.data = prepData(r2.data); S.journal = entriesFromData(r2.data); S.lastFetch = Date.now(); S.actualise = true; sauver();
     S.busy = false; fermer(); rendre(true);
     toastOK('Tes données sont maintenant sur ce téléphone. Ton fichier Google reste tel quel, comme filet de sécurité.');
-  } catch (e) { S.busy = false; dire("Passage annulé, rien n'a changé : " + (e && e.message || e)); }
+  } catch (e) { S.busy = false; dire("Passage annulé, rien n'a changé : " + (e && e.message || e)); if (S.queue.length) pomper(); } // une saisie faite pendant la copie part tout de suite au fichier
 }
 async function revenirFichier() {
   if (S.queue.length) { const z = $('#ferr'); if (z) z.textContent = 'Un enregistrement est en cours, réessaie dans un instant.'; return; }

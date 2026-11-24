@@ -167,15 +167,21 @@
     });
   }
   const lireKV = (db, k) => new Promise((ok, ko) => { const t = db.transaction('kv', 'readonly').objectStore('kv').get(k); t.onsuccess = () => ok(t.result); t.onerror = () => ko(t.error); });
-  const ecrireKV = (db, k, v) => new Promise((ok, ko) => { const t = db.transaction('kv', 'readwrite', { durability: 'strict' }); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(); t.onerror = () => ko(t.error); t.onabort = () => ko(t.error || new Error('Écriture annulée')); });
+  const ecrireKV = (db, k, v) => ecrireTout(db, { [k]: v });
+  // Plusieurs clés dans la même transaction : tout ou rien (le classeur et son numéro de révision ensemble)
+  const ecrireTout = (db, o) => new Promise((ok, ko) => { const t = db.transaction('kv', 'readwrite', { durability: 'strict' }); const s = t.objectStore('kv'); Object.keys(o).forEach(k => s.put(o[k], k)); t.oncomplete = () => ok(); t.onerror = () => ko(t.error); t.onabort = () => ko(t.error || new Error('Écriture annulée')); });
 
   function Moteur(prefixe) {
-    const M = this; let db = null, C = null, texte = null, prog = null, file = Promise.resolve();
+    const M = this; let db = null, C = null, texte = null, prog = null, file = Promise.resolve(), persiste = false;
     const S$ = { courant: null, get() { return this.courant; } };
     async function ouvrirBase() { return db || (db = await base(prefixe + 'telephone')); }
     async function charger() {
       await ouvrirBase();
-      if (!C) { const t = await lireKV(db, 'classeur'); C = t ? JSON.parse(t) : null; }
+      // Toujours la dernière version enregistrée : une autre fenêtre de l'appli (onglet du navigateur + appli installée)
+      // a pu écrire entre-temps. On compare le numéro de révision (lecture légère) avant de relire tout le classeur.
+      const rev = await lireKV(db, 'rev');
+      if (!C || rev === undefined || C.rev !== rev) { const t = await lireKV(db, 'classeur'); C = t ? JSON.parse(t) : null; }
+      if (!persiste) { persiste = true; try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} } // demander au navigateur de ne jamais effacer
       if (!prog) {
         // Le script : la version servie avec l'appli (mise à jour avec elle), sinon la dernière gardée dans le téléphone
         try { const r = await fetch('apps-script/Code.js', { cache: 'no-cache' }); if (r.ok) { const t = await r.text(); if (/function traiter_\(/.test(t)) { texte = t; ecrireKV(db, 'script', t).catch(() => {}); } } } catch (e) {}
@@ -184,17 +190,19 @@
         prog = compiler(texte)(S$);
       }
     }
-    M.existe = async () => { await ouvrirBase(); return !!(C || await lireKV(db, 'classeur')); };
+    M.existe = async () => { await ouvrirBase(); return !!(await lireKV(db, 'classeur')); };
     M.importer = async (data, cle) => {
       const nouveau = depuisDonnees(data, cle);
-      await ouvrirBase(); await ecrireKV(db, 'classeur', JSON.stringify(nouveau)); C = nouveau;
+      await ouvrirBase(); await ecrireTout(db, { classeur: JSON.stringify(nouveau), rev: nouveau.rev }); C = nouveau;
       try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (e) {}
       return true;
     };
     M.revision = () => (C ? C.rev : 0);
     M.instantane = () => (C ? JSON.parse(JSON.stringify(C)) : null);   // pour la sauvegarde
     // Une demande à la fois, dans l'ordre (comme le verrou du script)
-    M.appel = req => (file = file.then(() => traiterUne(req), () => traiterUne(req)));
+    // Entre fenêtres de l'appli : un verrou du navigateur (si disponible) pour qu'une seule écrive à la fois.
+    const verrou = fn => (navigator.locks && navigator.locks.request) ? navigator.locks.request(prefixe + 'telephone', fn) : fn();
+    M.appel = req => (file = file.then(() => verrou(() => traiterUne(req)), () => verrou(() => traiterUne(req))));
     async function traiterUne(req) {
       await charger();
       if (!C) return { ok: false, error: 'SANS_CLE', message: "Aucune donnée sur ce téléphone." };
@@ -205,7 +213,7 @@
       const apres = JSON.stringify(C);
       if (apres !== avant) {
         C.rev = (C.rev || 0) + 1; C.modifie = new Date().toISOString();
-        try { await ecrireKV(db, 'classeur', JSON.stringify(C)); }
+        try { await ecrireTout(db, { classeur: JSON.stringify(C), rev: C.rev }); }
         catch (err) { C = JSON.parse(avant); return { ok: false, error: 'OCCUPE', message: "Pas pu enregistrer sur le téléphone, nouvel essai automatique." }; }
       }
       return res;
