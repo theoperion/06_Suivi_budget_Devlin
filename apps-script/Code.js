@@ -50,6 +50,21 @@ function initialiserCle() {
   Logger.log('Clé enregistrée. Tu peux remettre CHANGE-MOI à la ligne 17.');
 }
 
+// Menu « Budget » dans le fichier (installation d'une nouvelle personne, 24/11/2026) : choisir sa clé sans toucher au code.
+function onOpen() {
+  try { SpreadsheetApp.getUi().createMenu('Budget').addItem('Choisir ma clé (installation)', 'choisirCle').addToUi(); } catch (e) {}
+}
+function choisirCle() {
+  const ui = SpreadsheetApp.getUi(), p = PropertiesService.getScriptProperties(), deja = p.getProperty('APP_KEY');
+  const r = ui.prompt('Ma clé', (deja ? "Une clé existe déjà : la nouvelle la remplacera (l'appli te la redemandera).\n\n" : '') +
+    "Choisis ta clé (au moins 6 caractères) : c'est le mot que tu taperas dans l'appli pour l'ouvrir.", ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const cle = String(r.getResponseText() || '').trim();
+  if (cle.length < 6) { ui.alert('Clé trop courte : au moins 6 caractères. Recommence par le menu Budget.'); return; }
+  p.setProperty('APP_KEY', cle);
+  ui.alert('Clé enregistrée ✓\n\nÉtape suivante : Extensions › Apps Script › Déployer › Nouveau déploiement.');
+}
+
 // À lancer depuis l'éditeur (choisis « verifier » en haut, puis ▶ Exécuter) :
 // donne à Google toutes les autorisations dont le script a besoin et vérifie que tout répond.
 function verifier() {
