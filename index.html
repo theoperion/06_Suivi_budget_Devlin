@@ -908,6 +908,10 @@ function api(action, extra) {
     }
     return r;
   });
+  return apiFichier(action, extra);
+}
+// Toujours vers le fichier Google (le script), quel que soit le mode : sert aussi au retour du téléphone vers le fichier.
+function apiFichier(action, extra) {
   const body = JSON.stringify(Object.assign({ action, key: S.key }, extra || {}));
   return fetch(S.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow' })
     .then(async r => { const t = await r.text(); if (!r.ok) throw new Error('HTTP ' + r.status + ' · ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120));
@@ -5381,9 +5385,13 @@ async function revenirFichier() {
   try {
     const m = await moteurTel(); const r = await m.appel({ action: 'data', key: S.key });
     if (!r || !r.ok || !r.data) throw new Error('lecture du téléphone impossible'); telD = r.data;
-    S.mode = 'fichier';
-    const r2 = await api('data'); if (!r2 || !r2.ok || !r2.data) throw new Error((r2 && r2.message) || 'fichier illisible'); fic = r2.data;
-  } catch (e) { S.mode = 'tel'; S.busy = false; return dire("Retour pas fait, rien n'a changé (" + (e && e.message || e) + ') : vérifie le réseau et réessaie.'); }
+    const r2 = await apiFichier('data'); if (!r2 || !r2.ok || !r2.data) throw new Error((r2 && r2.message) || 'fichier illisible'); fic = r2.data;
+    // Une saisie faite pendant la lecture (ou la fenêtre fermée) : on annule, elle reste sur le téléphone ; un nouveau retour l'enverra.
+    if (S.queue.length || !S.form || S.form.mode !== 'donnees') throw new Error('une saisie a été faite pendant la lecture');
+    const r3 = await m.appel({ action: 'data', key: S.key }); if (!r3 || !r3.ok || !r3.data) throw new Error('lecture du téléphone impossible'); telD = r3.data; // dernière version du téléphone
+    if (S.queue.length || !S.form || S.form.mode !== 'donnees') throw new Error('une saisie a été faite pendant la lecture');
+  } catch (e) { S.busy = false; if (S.queue.length) pomper(); return dire("Retour pas fait, rien n'a changé (" + (e && e.message || e) + ') : réessaie.'); } // une saisie faite pendant la lecture part sur le téléphone
+  S.mode = 'fichier';
   LS.set('mode', 'fichier'); S.data = prepData(fic); S.journal = entriesFromData(fic); S.lastFetch = Date.now(); S.actualise = true; sauver();
   S.busy = false; S.form = null; fermer();
   const cle = l => l.mois + '|' + l.lib + '|' + l.cat + '|' + Number(l.montant), reste = {};
