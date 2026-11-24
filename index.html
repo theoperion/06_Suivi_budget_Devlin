@@ -772,7 +772,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.42';
+const VERSION = '9.43';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -784,6 +784,10 @@ const API_ATTENDUE = '5.2'; // version minimale du script ; les versions plus r�
 // Script 5.14 ou plus : il reconnaît un envoi déjà fait (identifiant « uid ») même renvoyé après une coupure.
 // Avant (5.13) : l'appli vérifie elle-même dans le fichier avant de renvoyer une suppression incertaine.
 const API_UID = '5.14';
+// (phase 2) « Mes données sur ce téléphone » : le même script tourne dans le téléphone (moteur.js), sans fichier Google.
+// Visible dans Réglages seulement quand TEL_DISPO est vrai (en attendant la sauvegarde automatique dans le Drive),
+// ou si ce téléphone est déjà passé en mode téléphone.
+const TEL_DISPO = false;
 // Compare les versions partie par partie : « 5.10 » est bien plus récent que « 5.2 ».
 const versionAuMoins = (v, min) => { const a = String(v || '0').split('.').map(Number), b = String(min).split('.').map(Number); for (let i = 0; i < Math.max(a.length, b.length); i++) { const x = a[i] || 0, y = b[i] || 0; if (x !== y) return x > y; } return true; };
 
@@ -795,6 +799,7 @@ const LS = {
   set(k, v) { try { localStorage.setItem('jauge-devlin.' + k, JSON.stringify(v)); return true; } catch (e) { stockagePlein(); return false; } },
   del(k) { try { localStorage.removeItem('jauge-devlin.' + k); } catch (e) {} }
 };
+const PREFIXE_LS = (k => 'jauge-devlin.' + k)(''); // même préfixe que LS (base de données du mode téléphone)
 function stockagePlein() {
   if (Date.now() - S_plein < 60000) return; S_plein = Date.now(); // au plus un message par minute
   setTimeout(() => { try { toastOK('Mémoire du téléphone pleine. Tes saisies partent bien au fichier, mais garde le réseau jusqu\'à l\'envoi et libère de la place.'); } catch (e) {} }, 300);
@@ -822,7 +827,7 @@ const CAT_AV = 'Avances (on me doit)', estAv = n => /^Avances/i.test(String(n ||
 let now = new Date();
 const S = {
   data: null, journal: [], queue: LS.get('queue', []), key: LS.get('key', ''), api: (() => { const ok = /\/exec\/?$/.test(API_DEFAUT); if (ok && LS.get('apiDefautVu', '') !== API_DEFAUT) { LS.set('apiDefautVu', API_DEFAUT); LS.set('api', API_DEFAUT); } return LS.get('api', '') || (ok ? API_DEFAUT : ''); })(),
-  tab: 'home', y: now.getFullYear(), m: now.getMonth() + 1,
+  tab: 'home', y: now.getFullYear(), m: now.getMonth() + 1, mode: LS.get('mode', 'fichier') === 'tel' ? 'tel' : 'fichier',
   filtre: { cat: null, q: '' }, busy: false, lastFetch: 0, lastFrac: 0, anomOpen: false, form: null
 };
 (function chargerCache() {
@@ -858,7 +863,19 @@ appliquerTheme();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', appliquerTheme);
 
 /* ================= API ================= */
+// Mode téléphone : le moteur (moteur.js) n'est chargé que s'il sert ; mêmes demandes, mêmes réponses que le script Google.
+let MT_ = null;
+function moteurTel() {
+  return MT_ || (MT_ = new Promise((ok, ko) => {
+    if (window.MoteurTelephone) return ok(new MoteurTelephone(PREFIXE_LS));
+    const s = document.createElement('script'); s.src = 'moteur.js';
+    s.onload = () => window.MoteurTelephone ? ok(new MoteurTelephone(PREFIXE_LS)) : (MT_ = null, ko(new Error('Moteur du téléphone illisible')));
+    s.onerror = () => { MT_ = null; ko(new Error('Moteur du téléphone introuvable (pas de réseau ?)')); };
+    document.head.appendChild(s);
+  }));
+}
 function api(action, extra) {
+  if (S.mode === 'tel') return moteurTel().then(m => m.appel(Object.assign({ action, key: S.key }, extra || {})));
   const body = JSON.stringify(Object.assign({ action, key: S.key }, extra || {}));
   return fetch(S.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow' })
     .then(async r => { const t = await r.text(); if (!r.ok) throw new Error('HTTP ' + r.status + ' · ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120));
@@ -2196,7 +2213,7 @@ function montantNum() { const n = parseFloat(String(S.form.montant).replace(',',
 function rendreForm() {
   const f = S.form; if (!f) return;
   const RA = vuesAchats()[f.mode]; if (RA) return RA(); // feuilles « Achats plaisir » (liste d'envies, petits achats, réglages)
-  const R = { file: rendreFile, info: rendreInfo, videotheque: rendreVideotheque, vitrine: rendreVitrine, xplog: rendreXpLog, xpinfo: rendreXpInfo, jd: rendreJD, tuto: rendreTuto, aide: rendreModeEmploi, exclus: rendreExclus, soon: rendreSoon, objedit: rendreObjEdit, objdetail: rendreObjDetail, resume: rendreResume, bilmois: rendreBilMois, wrapped: rendreWrapped, remb: rendreRemb, defi: rendreDefi, lien: rendreLien, reglages: rendreReglages, budgets: rendreBudgets, cats: rendreCats, catedit: rendreCatEdit, solde: rendreSolde, ech: rendreEch, av: rendreAv, mois: rendreMoisGrille, fiche: rendreFiche }[f.mode];
+  const R = { file: rendreFile, info: rendreInfo, videotheque: rendreVideotheque, vitrine: rendreVitrine, xplog: rendreXpLog, xpinfo: rendreXpInfo, jd: rendreJD, tuto: rendreTuto, aide: rendreModeEmploi, exclus: rendreExclus, soon: rendreSoon, objedit: rendreObjEdit, objdetail: rendreObjDetail, resume: rendreResume, bilmois: rendreBilMois, wrapped: rendreWrapped, remb: rendreRemb, defi: rendreDefi, lien: rendreLien, donnees: rendreDonnees, reglages: rendreReglages, budgets: rendreBudgets, cats: rendreCats, catedit: rendreCatEdit, solde: rendreSolde, ech: rendreEch, av: rendreAv, mois: rendreMoisGrille, fiche: rendreFiche }[f.mode];
   if (R) return R();
   if (f.type === 'Épargne' && !f.sens) f.sens = f.cat && estRetraitEp(f.cat) ? 'retrait' : 'verser';
   const fav = favoris(f.type, f.sens), pins = LS.get('pins', []), moisFutur = statut(f.y, f.m) === 'futur', futur = estPrevu(f);
@@ -2961,9 +2978,10 @@ function rendreReglages() {
     <div class="grp" style="margin-top:18px">MON FICHIER ET AIDE</div>
     ${op('go:aide', "📖 Mode d'emploi", 'chaque écran, la saisie, les envois, les défis', 'lire ›')}
     <button class="opt" data-act="${nq || nr ? 'file' : 'refresh'}"><span>${nq ? 'Envois en attente' : nr ? 'Envois refusés à revoir' : 'Actualiser depuis le fichier'}</span><span class="${nq ? 'c-bad' : 'muted'} mono" style="font-size:12px">${nq ? nq + ' en attente · voir ›' : nr ? 'voir ›' : 'à jour'}</span></button>
-    ${S.data.url ? `<a class="opt" href="${esc(S.data.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir mon fichier Google Sheets</span><span class="muted">↗</span></a>` : ''}
-    ${op('go:lien', 'Lien de mon script', '', 'modifier ›')}
-    <button class="danger ${S.form.armOut ? 'armed' : ''}" data-act="logout" style="margin-top:14px">${S.form.armOut ? 'TOUCHE ENCORE : DÉCONNEXION DE CE TÉLÉPHONE' : 'SE DÉCONNECTER / CHANGER DE COMPTE'}</button>
+    ${S.data.url && S.mode !== 'tel' ? `<a class="opt" href="${esc(S.data.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir mon fichier Google Sheets</span><span class="muted">↗</span></a>` : ''}
+    ${TEL_DISPO || S.mode === 'tel' ? op('go:donnees', 'Où sont mes données', S.mode === 'tel' ? 'sur ce téléphone (essai)' : 'dans mon fichier Google', '›') : ''}
+    ${S.mode === 'tel' ? '' : op('go:lien', 'Lien de mon script', '', 'modifier ›')}
+    ${S.mode === 'tel' ? '' : `<button class="danger ${S.form.armOut ? 'armed' : ''}" data-act="logout" style="margin-top:14px">${S.form.armOut ? 'TOUCHE ENCORE : DÉCONNEXION DE CE TÉLÉPHONE' : 'SE DÉCONNECTER / CHANGER DE COMPTE'}</button>`}
     <p class="muted mono" style="font-size:11px;text-align:center;margin-top:22px">BUDGET · V${VERSION}</p>`;
 }
 
@@ -5218,6 +5236,54 @@ async function okLien() {
   } catch (e) { S.api = ancien; z.textContent = 'Connexion impossible avec ce lien'; }
 }
 
+/* ================= MES DONNÉES : FICHIER GOOGLE OU CE TÉLÉPHONE (phase 2) ================= */
+// Empreinte des données pour vérifier une copie : lignes du Journal, total de chaque mois, catégories, Échéancier, À venir,
+// soldes, contrôle, défis, préférences. Deux empreintes identiques = rien de perdu ni de changé.
+function resumeDonnees(d) {
+  const pm = {}; (d.journal || []).forEach(l => { pm[l.mois] = Math.round(((pm[l.mois] || 0) + Number(l.montant || 0)) * 100) / 100; });
+  return JSON.stringify({ n: (d.journal || []).length, pm, cats: (d.categories || []).map(c => [c.nom, c.groupe, c.type, c.budget, c.suivi]),
+    ech: (d.echeancier || []).map(e => [e.lib, e.cat, e.montant, e.freq, e.jour, e.pause]), av: (d.avenir || []).map(a => [a.mois, a.lib, a.montant, a.fait]),
+    soldes: d.soldes, ctl: d.controle, debut: d.debut, defis: d.defis, prefs: d.prefs, mois: d.mois, libres: d.libres });
+}
+const telDepuis = () => LS.get('telDepuis', null);
+function rendreDonnees() {
+  const f = S.form, tel = S.mode === 'tel', dep = telDepuis();
+  let h = enteteSheet('RÉGLAGES', 'reglages');
+  if (!tel) h += `<div class="grp" style="margin-top:14px">OÙ SONT MES DONNÉES</div>
+    <div class="note" style="display:block">Aujourd'hui, tes dépenses sont dans <b>ton fichier Google Sheets</b> : l'appli passe par ton script pour les lire et les écrire.</div>
+    <div class="note" style="display:block;margin-top:8px">Sur <b>ce téléphone</b>, elles sont gardées dans le téléphone : plus de script, tout est instantané, même sans réseau. Ton fichier Google ne bouge plus : il reste tel qu'au jour du passage, comme filet de sécurité, et tu peux y revenir à tout moment.</div>
+    <div class="note" style="display:block;margin-top:8px">⚠ <b>Essai</b> : la sauvegarde automatique dans ton Drive arrive bientôt. D'ici là, ce que tu saisis après le passage n'existe que sur ce téléphone.</div>
+    <div class="err" id="ferr"></div><button class="go" data-act="donnees-tel">PASSER SUR CE TÉLÉPHONE</button>`;
+  else h += `<div class="grp" style="margin-top:14px">OÙ SONT MES DONNÉES</div>
+    <div class="note" style="display:block">Tes données sont <b>sur ce téléphone</b>${dep ? ' depuis le ' + esc(new Date(dep.le).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })) : ''} · <span id="telrev">…</span></div>
+    <div class="note" style="display:block;margin-top:8px">Ton fichier Google est resté tel qu'au jour du passage. Si tu y reviens, les changements faits ici depuis n'y seront pas.</div>
+    <div class="err" id="ferr"></div><button class="danger ${f.arm ? 'armed' : ''}" data-act="donnees-fichier" style="margin-top:14px">${f.arm ? 'TOUCHE ENCORE : RETOUR AU FICHIER (sans les changements faits ici)' : 'REVENIR À MON FICHIER GOOGLE'}</button>`;
+  $('#sheetIn').innerHTML = h;
+  if (tel) moteurTel().then(m => { const z = $('#telrev'), n = m.revision() - ((dep && dep.rev) || 0); if (z) z.textContent = n > 0 ? n + ' changement' + (n > 1 ? 's' : '') + ' depuis' : 'aucun changement depuis'; }).catch(() => {});
+}
+async function passerTelephone() {
+  const dire = x => { const z = $('#ferr'); if (z) z.textContent = x; };
+  if (S.mode === 'tel' || S.busy) return;
+  if (S.queue.length) return dire("Il reste des envois en attente : attends qu'ils partent dans ton fichier (Réglages › Envois en attente), puis recommence.");
+  dire('Copie de ton fichier sur ce téléphone…'); S.busy = true;
+  try {
+    const r = await api('data'); if (!r || !r.ok || !r.data) throw new Error((r && r.message) || 'fichier illisible');
+    const m = await moteurTel(); await m.importer(r.data, S.key);
+    const r2 = await m.appel({ action: 'data', key: S.key });
+    if (!r2 || !r2.ok || resumeDonnees(r2.data) !== resumeDonnees(r.data)) throw new Error('la copie ne correspond pas exactement à ton fichier');
+    S.mode = 'tel'; LS.set('mode', 'tel'); LS.set('telDepuis', { le: new Date().toISOString(), rev: m.revision() });
+    S.data = prepData(r2.data); S.journal = entriesFromData(r2.data); S.lastFetch = Date.now(); S.actualise = true; sauver();
+    S.busy = false; fermer(); rendre(true);
+    toastOK('Tes données sont maintenant sur ce téléphone. Ton fichier Google reste tel quel, comme filet de sécurité.');
+  } catch (e) { S.busy = false; dire("Passage annulé, rien n'a changé : " + (e && e.message || e)); }
+}
+async function revenirFichier() {
+  if (S.queue.length) { const z = $('#ferr'); if (z) z.textContent = 'Un enregistrement est en cours, réessaie dans un instant.'; return; }
+  S.mode = 'fichier'; LS.set('mode', 'fichier'); S.lastFetch = 0; S.form = null; fermer();
+  await rafraichir(true); rendre(true);
+  toastOK('Retour à ton fichier Google : tu le retrouves tel qu\'au jour du passage.');
+}
+
 /* ================= TOAST ================= */
 let tt, toastGarde = null;
 // garde : le message reste affiché jusqu'à l'appui sur OK (message important, long à lire). Un message éclair
@@ -5735,6 +5801,9 @@ document.addEventListener('click', ev => {
       S.queue.splice(i, 1); const e = trouver(o.id); if (e && !S.queue.some(q => q.id === e.id)) e.pending = false; sauver(); S.form.arm = false; rendreFile(); rendre(true); toast('Envoi abandonné : à ressaisir si besoin'); pomper(); } break;
     case 'logout': if (!S.form.armOut) { S.form.armOut = true; rendreReglages(); } else { fermer(); oublierCompte(); rendre(); verrouiller(); } break;
     case 'go:lien': S.form = { mode: 'lien', url: S.api }; rendreForm(); break;
+    case 'go:donnees': S.form = { mode: 'donnees' }; rendreForm(); break;
+    case 'donnees-tel': passerTelephone(); break;
+    case 'donnees-fichier': if (!S.form.arm) { S.form.arm = true; rendreForm(); } else revenirFichier(); break;
     case 'lien-ok': okLien(); break;
   }
 });
