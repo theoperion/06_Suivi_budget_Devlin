@@ -36,6 +36,11 @@
  *     (Exécuter en tant que : moi · Accès : tout le monde).
  */
 
+/**
+ * @OnlyCurrentDoc
+ * (24/11/2026) Le script ne demande l'accès qu'au fichier qui le contient, rien d'autre du Drive : plus sûr,
+ * et l'écran d'autorisation de Google est plus court. Le fichier doit donc contenir le script (ID_FICHIER vide).
+ */
 const CLE_A_ENREGISTRER = 'CHANGE-MOI';
 const VERSION_API = '5.14';
 
@@ -170,7 +175,8 @@ function lot_(ops) {
 // Le classeur n'est ouvert qu'une fois par demande (avant : 2 ou 3 fois par ajout).
 let SS_ = null;
 function classeur_() {
-  return SS_ || (SS_ = ID_FICHIER ? SpreadsheetApp.openById(ID_FICHIER) : SpreadsheetApp.getActiveSpreadsheet());
+  // D'abord le fichier qui contient le script (compatible avec @OnlyCurrentDoc) ; l'identifiant ne sert qu'à un script séparé.
+  return SS_ || (SS_ = SpreadsheetApp.getActiveSpreadsheet() || (ID_FICHIER ? SpreadsheetApp.openById(ID_FICHIER) : null));
 }
 
 // Onglet caché « Diagnostic » : une ligne par demande (heure, action, durée, résultat), 300 dernières gardées.
