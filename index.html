@@ -772,7 +772,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.41';
+const VERSION = '9.42';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -788,7 +788,6 @@ const API_UID = '5.14';
 const versionAuMoins = (v, min) => { const a = String(v || '0').split('.').map(Number), b = String(min).split('.').map(Number); for (let i = 0; i < Math.max(a.length, b.length); i++) { const x = a[i] || 0, y = b[i] || 0; if (x !== y) return x > y; } return true; };
 
 /* ================= OUTILS ================= */
-const IN_GAS = typeof google !== 'undefined' && google.script && google.script.run;
 const $ = s => document.querySelector(s);
 const LS = {
   get(k, d) { try { const v = localStorage.getItem('jauge-devlin.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -861,7 +860,6 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', appliquerT
 /* ================= API ================= */
 function api(action, extra) {
   const body = JSON.stringify(Object.assign({ action, key: S.key }, extra || {}));
-  if (IN_GAS) return new Promise((res, rej) => google.script.run.withSuccessHandler(t => res(JSON.parse(t))).withFailureHandler(rej).api(body));
   return fetch(S.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow' })
     .then(async r => { const t = await r.text(); if (!r.ok) throw new Error('HTTP ' + r.status + ' · ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120));
       try { return JSON.parse(t); } catch (e) { throw new Error('Réponse inattendue du script (souvent : autorisation Google à redonner ou déploiement à refaire) · ' + t.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)); } });
@@ -1880,7 +1878,7 @@ function cartePointBas(yC, mC) {
     <div class="pbleg">${mode !== 'futur' ? '<span><i></i>calculé</span>' : ''}${mode !== 'passe' ? '<span><i style="background:repeating-linear-gradient(90deg,var(--ink2) 0 4px,transparent 4px 7px)"></i>prévu</span>' : ''}${mode === 'cours' ? '<span><i style="width:2px;height:10px;background:var(--acc,var(--ok))"></i>aujourd\'hui</span>' : ''}<span class="c-ok">● entrée</span><span class="c-bad">● sortie</span></div></button>`;
 }
 function alerteVersion() {
-  if (IN_GAS || !S.data || versionAuMoins(S.data.apiVersion, API_ATTENDUE)) return '';
+  if (!S.data || versionAuMoins(S.data.apiVersion, API_ATTENDUE)) return '';
   return `<div class="alert" style="cursor:default">⚠ Ton Apps Script n'est pas à jour : certaines modifications ne seront pas enregistrées.<ul style="list-style:none;padding:0"><li>Dans Apps Script, recolle le dernier Code.gs, puis Déployer › Gérer les déploiements › crayon › Nouvelle version › Déployer.</li></ul></div>`;
 }
 const INFOS = {
@@ -2964,7 +2962,7 @@ function rendreReglages() {
     ${op('go:aide', "📖 Mode d'emploi", 'chaque écran, la saisie, les envois, les défis', 'lire ›')}
     <button class="opt" data-act="${nq || nr ? 'file' : 'refresh'}"><span>${nq ? 'Envois en attente' : nr ? 'Envois refusés à revoir' : 'Actualiser depuis le fichier'}</span><span class="${nq ? 'c-bad' : 'muted'} mono" style="font-size:12px">${nq ? nq + ' en attente · voir ›' : nr ? 'voir ›' : 'à jour'}</span></button>
     ${S.data.url ? `<a class="opt" href="${esc(S.data.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Ouvrir mon fichier Google Sheets</span><span class="muted">↗</span></a>` : ''}
-    ${IN_GAS ? '' : op('go:lien', 'Lien de mon script', '', 'modifier ›')}
+    ${op('go:lien', 'Lien de mon script', '', 'modifier ›')}
     <button class="danger ${S.form.armOut ? 'armed' : ''}" data-act="logout" style="margin-top:14px">${S.form.armOut ? 'TOUCHE ENCORE : DÉCONNEXION DE CE TÉLÉPHONE' : 'SE DÉCONNECTER / CHANGER DE COMPTE'}</button>
     <p class="muted mono" style="font-size:11px;text-align:center;margin-top:22px">BUDGET · V${VERSION}</p>`;
 }
@@ -3797,7 +3795,6 @@ const FEAT = [
   ['alertes', 'Alertes futées', 'Abonnements qui augmentent, catégories qui dérapent, gros prélèvements.', 2027, 3],
   ['cosmetiques', 'Collection étendue', 'Thèmes, mascotte, tampons, polices, aiguilles, fêtes, tickets.', 2027, 5]
 ];
-const ACCES_ANTICIPE = false; // INUTILISÉE : l'accès anticipé n'existe plus (tout est débloqué), gardée car commun/generer.py remplace cette ligne
 // Tout est disponible pour tout le monde : l'XP est celle du cas « tout débloqué » (ancien accès anticipé), quelle que soit l'appli
 const dispo = k => true;
 const ouvert = k => dispo(k) && on(k === 'cosmetiques' ? 'jeu' : k);
@@ -5175,18 +5172,18 @@ function verrouiller(msg) {
   const l = $('#lock'); l.hidden = false;
   l.innerHTML = `<div class="in"><div class="mono" style="letter-spacing:6px;font-weight:600;font-size:22px">BUDGET</div>
     <p class="muted" style="margin:6px 0 22px">ton budget, à l'aiguille près</p>
-    ${IN_GAS ? '' : `<input class="libin" id="uin" type="url" placeholder="Lien de ton script (finit par /exec)" value="${esc(S.api || '')}" autocomplete="off" style="font-size:14px">`}
+    <input class="libin" id="uin" type="url" placeholder="Lien de ton script (finit par /exec)" value="${esc(S.api || '')}" autocomplete="off" style="font-size:14px">
     <input class="libin" id="kin" type="password" placeholder="Ta clé" autocomplete="current-password" style="margin-top:0">
     <div class="err" id="kerr">${msg ? esc(msg) : ''}</div>
     <button class="go" id="kgo">OUVRIR</button>
-    ${IN_GAS ? '' : `<p class="muted" style="font-size:12px;margin-top:18px;text-align:left">Le lien se trouve dans ton fichier : Extensions › Apps Script › Déployer › Gérer les déploiements. Il reste sur ce téléphone et n'est envoyé qu'à ton propre script.</p>`}</div>`;
+    <p class="muted" style="font-size:12px;margin-top:18px;text-align:left">Le lien se trouve dans ton fichier : Extensions › Apps Script › Déployer › Gérer les déploiements. Il reste sur ce téléphone et n'est envoyé qu'à ton propre script.</p></div>`;
   const go = $('#kgo');
   const valider = async () => {
-    const u = IN_GAS ? '' : $('#uin').value.trim(), v = $('#kin').value.trim();
-    if (!IN_GAS && !URL_OK(u)) { $('#kerr').textContent = 'Colle le lien complet de ton script (https://script.google.com/macros/s/…/exec)'; return; }
+    const u = $('#uin').value.trim(), v = $('#kin').value.trim();
+    if (!URL_OK(u)) { $('#kerr').textContent = 'Colle le lien complet de ton script (https://script.google.com/macros/s/…/exec)'; return; }
     if (!v) { $('#kerr').textContent = 'Tape ta clé'; return; }
     const ancien = S.api;
-    if (!IN_GAS && ancien && ancien !== u) oublierCompte();
+    if (ancien && ancien !== u) oublierCompte();
     go.textContent = 'VÉRIFICATION…'; S.key = v; S.api = u;
     try {
       const r = await api('data');
@@ -5198,7 +5195,7 @@ function verrouiller(msg) {
   };
   go.addEventListener('click', valider);
   $('#kin').addEventListener('keydown', e => { if (e.key === 'Enter') valider(); });
-  setTimeout(() => (IN_GAS || S.api ? $('#kin') : $('#uin')).focus(), 100);
+  setTimeout(() => (S.api ? $('#kin') : $('#uin')).focus(), 100);
 }
 function rendreLien() {
   const f = S.form;
@@ -5501,26 +5498,24 @@ function clicAchats(a, el) {
 // de l'historique (et plus par un drapeau), ce qui reste juste après une mise en veille, un rechargement ou deux retours rapides.
 const estGarde = () => { try { return !!(history.state && history.state.jauge === 'garde'); } catch (e) { return false; } };
 function armerRetour() {
-  if (IN_GAS || estGarde()) return;
+  if (estGarde()) return;
   try { if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; history.pushState({ jauge: 'garde' }, ''); } catch (e) {}
 }
-if (!IN_GAS) {
-  try { history.scrollRestoration = 'manual'; } catch (e) {}
-  addEventListener('popstate', () => {
-    if (estGarde()) return; // on revient « en avant » sur la garde : rien à faire
-    const st = document.querySelector('.story'), pl = $('#plein');
-    if (st) { if (st._fermer) st._fermer(); else st.remove(); }
-    else if (pl && pl.classList.contains('on')) fermerPlein();
-    else if ($('#sheet').classList.contains('on')) fermer();
-    else if (S.tab !== 'home') { S.tab = 'home'; S.filtre.cat = null; S.filtre.grp = null; rendre(); scrollTo(0, 0); }
-    else toast("Tu es sur l'accueil. Pour quitter, utilise le bouton ou le geste « accueil » du téléphone");
-    armerRetour(); // la garde est reposée tout de suite : le prochain « retour » reste aussi dans l'appli
-  });
-  ['click', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, armerRetour, true)); // chaque geste repose la garde si besoin
-  // Retour sur l'appli après une mise en veille : on redessine (évite une page restée vide)
-  addEventListener('pageshow', e => { if (e.persisted) { try { rendre(true); } catch (x) {} } });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !document.querySelector('#view *')) { try { rendre(true); } catch (x) {} } });
-}
+try { history.scrollRestoration = 'manual'; } catch (e) {}
+addEventListener('popstate', () => {
+  if (estGarde()) return; // on revient « en avant » sur la garde : rien à faire
+  const st = document.querySelector('.story'), pl = $('#plein');
+  if (st) { if (st._fermer) st._fermer(); else st.remove(); }
+  else if (pl && pl.classList.contains('on')) fermerPlein();
+  else if ($('#sheet').classList.contains('on')) fermer();
+  else if (S.tab !== 'home') { S.tab = 'home'; S.filtre.cat = null; S.filtre.grp = null; rendre(); scrollTo(0, 0); }
+  else toast("Tu es sur l'accueil. Pour quitter, utilise le bouton ou le geste « accueil » du téléphone");
+  armerRetour(); // la garde est reposée tout de suite : le prochain « retour » reste aussi dans l'appli
+});
+['click', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, armerRetour, true)); // chaque geste repose la garde si besoin
+// Retour sur l'appli après une mise en veille : on redessine (évite une page restée vide)
+addEventListener('pageshow', e => { if (e.persisted) { try { rendre(true); } catch (x) {} } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !document.querySelector('#view *')) { try { rendre(true); } catch (x) {} } });
 
 /* ================= ÉVÉNEMENTS ================= */
 document.addEventListener('click', ev => {
@@ -5778,11 +5773,11 @@ function glisserVers(sens) {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { const avant = now.toDateString(); majDate(); if (now.toDateString() !== avant || avant !== new Date().toDateString()) rendre(); rafraichir(false); pomper(); } });
 
 /* ================= DÉMARRAGE ================= */
-if (!S.key || (!IN_GAS && !S.api)) verrouiller(); else { rendre(); rafraichir(true); pomper(); if (/[?&]saisie=1/.test(location.search)) { ouvrirSaisie(null); try { history.replaceState(history.state, '', location.pathname); } catch (e) {} } }
+if (!S.key || !S.api) verrouiller(); else { rendre(); rafraichir(true); pomper(); if (/[?&]saisie=1/.test(location.search)) { ouvrirSaisie(null); try { history.replaceState(history.state, '', location.pathname); } catch (e) {} } }
 // (9.27) Mises à jour automatiques : quand une nouvelle version est installée, l'appli se recharge d'elle-même
 // (jamais pendant une saisie : elle attend que la fenêtre soit fermée). Au retour au premier plan (Firefox garde l'appli
 // endormie), on vérifie s'il y a une nouvelle version.
-if (!IN_GAS && 'serviceWorker' in navigator && location.protocol === 'https:') {
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
   const avaitSW = !!navigator.serviceWorker.controller; let recharge = false;
   const rechargerSiLibre = () => { if (!recharge) return; if (document.querySelector('#sheet.on') || document.querySelector('.story') || S.busy) { setTimeout(rechargerSiLibre, 3000); return; } /* S.busy : un envoi est en route (sa réponse serait perdue) */ LS.set('majVue', 1); location.reload(); };
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (!avaitSW || recharge) return; recharge = true; rechargerSiLibre(); });
