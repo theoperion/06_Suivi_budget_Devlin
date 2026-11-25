@@ -773,7 +773,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.46';
+const VERSION = '9.47';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -5988,7 +5988,15 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (!avaitSW || recharge) return; recharge = true; rechargerSiLibre(); });
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
     const verif = () => { try { reg.update(); } catch (e) {} };
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') verif(); });
+    // (9.47) Si une version plus récente existe sur le serveur mais n'arrive pas toute seule (iPhone), on le dit : bouton « METTRE À JOUR »
+    // (efface la copie gardée sur le téléphone et recharge ; les réglages et la clé ne sont pas touchés).
+    const num = v => String(v).split('.').map(x => parseInt(x, 10) || 0);
+    const plusRecente = (a, b) => { const x = num(a), y = num(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+    const majManuelle = async () => { try { (await navigator.serviceWorker.getRegistrations()).forEach(r => r.unregister()); (await caches.keys()).filter(k => k.indexOf('jauge') === 0).forEach(k => caches.delete(k)); } catch (e) {} location.reload(); };
+    let majDejaDite = '';
+    const cherche = () => { fetch('index.html?maj=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.text() : '').then(t => { const m = /const VERSION = '([0-9.]+)'/.exec(t); if (m && plusRecente(m[1], VERSION) && majDejaDite !== m[1]) { majDejaDite = m[1]; toast('Nouvelle version ' + m[1] + ' disponible', 'METTRE À JOUR', majManuelle, true); } }).catch(() => {}); };
+    setTimeout(cherche, 6000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { verif(); setTimeout(cherche, 4000); } });
     setInterval(verif, 30 * 60 * 1000);
   }).catch(() => {});
   if (LS.get('majVue', 0)) { LS.set('majVue', 0); setTimeout(() => { try { toast('Appli mise à jour · version ' + VERSION); } catch (e) {} }, 1500); }
