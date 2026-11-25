@@ -772,7 +772,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.41';
+const VERSION = '9.42';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1287,7 +1287,7 @@ function estCourante(cat) { const c = catMap()[cat]; return !!c && c.type === 'D
 // Par défaut : celles dont le nom évoque les courses. Modifiable dans Progrès › Défis › Séries.
 const RE_COURSES = /courses|alimentation|supermarch|[ée]picerie|cantine|self|restau(rant)? d.entreprise/i;
 // (lot L2) Seules les dépenses ESSENTIELLES peuvent être cochées : « Sans alerte », ou un nom qui évoque courses, cantine, santé.
-const RE_ESSENTIEL = /courses|alimentation|supermarch|[ée]picerie|cantine|self|restau(rant)? d.entreprise|sant[ée]|pharmac|m[ée]dec|m[ée]dic|docteur|dentiste|mutuelle|optique|opticien/i;
+const RE_ESSENTIEL = /courses|alimentation|supermarch|[ée]picerie|cantine|self|restau(rant)? d.entreprise|sant[ée]|pharmac|m[ée]dec|m[ée]dic|docteur|dentiste|mutuelle|optique|opticien|transport|carburant|essence|navigo/i; // 9.42 (Théo) : les transports comptent aussi parmi les dépenses essentielles
 const estEssentielle = n => { const c = catMap()[n]; return !!c && (c.suivi === 'Sans alerte' || RE_ESSENTIEL.test(n)); };
 function exclusDefaut() { return cats().filter(c => estCourante(c.nom) && RE_COURSES.test(c.nom)).map(c => c.nom); }
 // (lot L2) Historique des listes : [[date d'effet, liste], …] dans la préférence « jeu » (clé exH). '' = depuis toujours.
@@ -1332,7 +1332,7 @@ function rendreExclus() {
   // (lot L2) Seules les dépenses essentielles sont proposées (+ celles déjà cochées avant, pour pouvoir les décocher)
   const f = S.form, L = cats().filter(c => (estCourante(c.nom) || estFixeManuelle(c.nom)) && (estEssentielle(c.nom) || f.ex.includes(c.nom)));
   $('#sheetIn').innerHTML = enteteSheet('NE CASSENT PAS LES SÉRIES', f.retour || null) + `
-    <div class="note" style="display:block;margin-top:10px">Coche les dépenses <b>essentielles</b> qui <b>ne cassent pas</b> un jour sans dépense (séries, Novembre sobre, mission du mois, calendrier de l'avent) : courses, cantine, santé, budgets « Sans alerte ». Les montants restent bien sûr comptés dans tes budgets. Les prélèvements automatiques de l'Échéancier ne cassent jamais une journée ; une charge fixe (abonnement, assurance…) saisie à la main, oui.<br><br>Un changement compte <b>à partir d'aujourd'hui</b> : les jours déjà passés ne bougent pas.<br><br>Seules les dépenses essentielles sont proposées (si tu décoches une autre catégorie, tu ne pourras plus la recocher).</div>
+    <div class="note" style="display:block;margin-top:10px">Coche les dépenses <b>essentielles</b> qui <b>ne cassent pas</b> un jour sans dépense (séries, Novembre sobre, mission du mois, calendrier de l'avent) : courses, cantine, santé, transports, budgets « Sans alerte ». Les montants restent bien sûr comptés dans tes budgets. Les prélèvements automatiques de l'Échéancier ne cassent jamais une journée ; une charge fixe (abonnement, assurance…) saisie à la main, oui.<br><br>Un changement compte <b>à partir d'aujourd'hui</b> : les jours déjà passés ne bougent pas.<br><br>Seules les dépenses essentielles sont proposées (si tu décoches une autre catégorie, tu ne pourras plus la recocher).</div>
     <div class="chips" style="margin-top:10px">${L.map(c => `<button class="chip ${f.ex.includes(c.nom) ? 'on' : ''}" data-act="exclus-tog" data-cat="${esc(c.nom)}">${f.ex.includes(c.nom) ? '✓ ' : ''}${esc(c.nom)}</button>`).join('')}</div>
     <button class="go" data-act="exclus-ok">ENREGISTRER</button>`;
 }
@@ -2159,7 +2159,7 @@ function sectionsModeEmploi() {
       ['🕵️', 'MISSION DU MOIS', "Tirée au sort chaque mois (la même sur tous tes appareils) : un week-end à zéro, quelques jours sans dépense… Réussie = +" + MISSION_XP + " XP."],
       ['⚡', 'ÉVÉNEMENTS', "Ils apparaissent certaines semaines et durent de 2 à 10 jours. Réussis, ils rapportent un badge à collectionner et de l'XP."],
       ['🍂', 'SAISONS', FEAT_DETAIL.saison],
-      ['🧺', 'LES DÉPENSES ESSENTIELLES', "Les catégories « Sans alerte » et celles cochées dans « ne cassent pas les séries » (courses, cantine, santé…) ne servent jamais de défi : on ne se prive pas de manger pour gagner des points."],
+      ['🧺', 'LES DÉPENSES ESSENTIELLES', "Les catégories « Sans alerte » et celles cochées dans « ne cassent pas les séries » (courses, cantine, santé, transports…) ne servent jamais de défi : on ne se prive pas de manger pour gagner des points."],
       ['🏅', 'SUCCÈS', "Ton niveau (jusqu'à 100), tes points d'expérience (XP) et leur journal, les succès débloqués. Chaque niveau rapporte une récompense."],
       ['🛡️', 'MES ÉCUSSONS', "Les écussons des événements et des saisons : Stats › Progrès › Succès (ou Défis), bouton « 🛡️ MES ÉCUSSONS »."],
       ['🎨', 'STYLE ET COLLECTION', "Thèmes, jauges, tampons et autres cosmétiques gagnés avec les niveaux : choisis ceux que tu veux afficher."]]],
@@ -2174,7 +2174,7 @@ function sectionsModeEmploi() {
       ['↓', 'ACTUALISER', "Tire l'écran vers le bas pour récupérer ce qui a changé dans le fichier (ou sur un autre téléphone). Tes saisies pas encore envoyées sont gardées."]]],
     ['reglages', '⚙', 'RÉGLAGES UTILES', 'Adapter l\'appli à ta façon de faire.', [
       ['?', 'AIDES ET EXPLICATIONS', "Masque les « ? », et l'aide de la saisie quand tu n'en as plus besoin. Ce mode d'emploi reste toujours dans Réglages."],
-      ['🧺', 'CATÉGORIES QUI NE CASSENT PAS LES SÉRIES', "Réglages › Mon budget (ou Stats › Progrès › Défis, tout en bas) : coche par exemple Courses si faire les courses ne doit pas casser un jour sans dépense. Seules les dépenses <b>essentielles</b> sont proposées (courses, cantine, santé, budgets « Sans alerte »). Un changement compte <b>à partir d'aujourd'hui</b> : les jours déjà passés ne bougent pas. Les montants comptent toujours dans tes budgets.<br><br><b>Pour qu'un jour compte</b>, il faut au moins une dépense saisie (courses comprises) dans la semaine avant ou la semaine après : un budget laissé vide ne gagne rien.<br><br><b>Ce qui casse une journée</b> : une dépense courante (courses, sorties, divers…) ou une charge fixe <b>saisie à la main</b> (un abonnement pris en plus, par exemple). <b>Ce qui ne la casse jamais</b> : les prélèvements automatiques de l'Échéancier, les lignes « Écart … », les revenus, l'épargne, les catégories cochées ici. Une journée n'est comptée qu'une fois terminée (le lendemain)."],
+      ['🧺', 'CATÉGORIES QUI NE CASSENT PAS LES SÉRIES', "Réglages › Mon budget (ou Stats › Progrès › Défis, tout en bas) : coche par exemple Courses si faire les courses ne doit pas casser un jour sans dépense. Seules les dépenses <b>essentielles</b> sont proposées (courses, cantine, santé, transports, budgets « Sans alerte »). Un changement compte <b>à partir d'aujourd'hui</b> : les jours déjà passés ne bougent pas. Les montants comptent toujours dans tes budgets.<br><br><b>Pour qu'un jour compte</b>, il faut au moins une dépense saisie (courses comprises) dans la semaine avant ou la semaine après : un budget laissé vide ne gagne rien.<br><br><b>Ce qui casse une journée</b> : une dépense courante (courses, sorties, divers…) ou une charge fixe <b>saisie à la main</b> (un abonnement pris en plus, par exemple). <b>Ce qui ne la casse jamais</b> : les prélèvements automatiques de l'Échéancier, les lignes « Écart … », les revenus, l'épargne, les catégories cochées ici. Une journée n'est comptée qu'une fois terminée (le lendemain)."],
       ['📅', 'CHAQUE MOIS', "En haut des Réglages : le contrôle du solde (✓ quand il est fait pour le mois), le retrait d'espèces et les budgets par catégorie."],
       ['⏱', 'TAUX HORAIRE', "Dans Achats plaisir : calculé tout seul (salaire moyen des 3 derniers mois ÷ tes heures de contrat). Tu peux changer les heures par semaine ou saisir un taux à la main."],
       ['◀', 'BOUTON RETOUR', "Le retour du téléphone ferme la fenêtre ouverte, puis revient à l'accueil. Il ne fait jamais sortir de l'appli : pour la quitter, utilise le bouton ou le geste « accueil » du téléphone."],
