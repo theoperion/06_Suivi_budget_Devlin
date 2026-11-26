@@ -14,7 +14,7 @@
  * @OnlyCurrentDoc
  * Le script ne demande l'accès qu'au fichier qui le contient, rien d'autre du Drive.
  */
-const VERSION_API = '5.15';
+const VERSION_API = '5.16';
 
 // Vide : le script est dans le fichier (Extensions › Apps Script). Rempli seulement pour un script séparé.
 const ID_FICHIER = '1TFXRVMLuVv_NauUH7VyJ4Pgd-Us5JuD3_3lzN_ojfvQ'; // fichier budget de Devlin
@@ -30,6 +30,10 @@ function choisirCle() {
   if (r.getSelectedButton() !== ui.Button.OK) return;
   const cle = String(r.getResponseText() || '').trim();
   if (cle.length < 6) { ui.alert('Clé trop courte : au moins 6 caractères. Recommence par le menu Budget.'); return; }
+  // (5.16) La clé est demandée deux fois : une faute de frappe ne doit pas t'enfermer dehors.
+  const r2 = ui.prompt('Ma clé : confirmation', 'Retape exactement la même clé pour la confirmer.', ui.ButtonSet.OK_CANCEL);
+  if (r2.getSelectedButton() !== ui.Button.OK) return;
+  if (String(r2.getResponseText() || '').trim() !== cle) { ui.alert("Les deux clés sont différentes : rien n'a été enregistré. Recommence par le menu Budget › Choisir ma clé."); return; }
   p.setProperty('APP_KEY', cle);
   ui.alert('Clé enregistrée ✓\n\nÉtape suivante : Extensions › Apps Script › Déployer › Nouveau déploiement.');
 }

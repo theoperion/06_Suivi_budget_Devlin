@@ -773,7 +773,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.47';
+const VERSION = '9.48';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -788,6 +788,12 @@ const API_UID = '5.14';
 // (phase 2) « Mes données sur ce téléphone » : le même script tourne dans le téléphone (moteur.js), sans fichier Google.
 // Visible dans Réglages seulement quand TEL_DISPO est vrai (en attendant la sauvegarde automatique dans le Drive),
 // ou si ce téléphone est déjà passé en mode téléphone.
+const LIVRETS_LIES = false; // (9.48) Théo seulement : boutons Livret A / LDDS / LEP dans ÉPARGNE ; son fichier Portefeuille & Épargne recopie ces lignes (copies : false)
+// Livret réglementé reconnu au début du libellé (sans tenir compte des majuscules/accents) : « Livret A », « LDDS », « LEP ».
+// Même règle que le script du fichier Portefeuille & Épargne de Théo : ne pas la changer sans changer l'autre.
+const LIVRETS = ['Livret A', 'LDDS', 'LEP'];
+function livretDe(lib) { const t = String(lib || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); return LIVRETS.find(n => new RegExp('^' + n.toLowerCase() + '(?![a-z0-9])').test(t)) || null; }
+function libSansLivret(lib) { const l = livretDe(lib); let r = String(lib || '').trim(); if (l) r = r.slice(l.length).replace(/^[\s·:\-–—/]+/, ''); return /^retrait livret$/i.test(r) ? '' : r; }
 const TEL_DISPO = false; // essai arrêté par Théo le 24/11 (il reste sur son fichier) ; l'option reste visible tant qu'un téléphone est en mode téléphone
 // Sauvegarde dans le Drive (sauvegarde.js) : identifiant de l'appli chez Google (public, ce n'est pas un secret).
 const GOOGLE_CLIENT_ID = '744152701006-9cm0gsv6sr23ipgq02jikgo5ccacrit4.apps.googleusercontent.com';
@@ -2172,7 +2178,7 @@ function ouvrirSaisie(e, dup) {
 const TUTO = [
   ['💸', 'DÉPENSE', "Tout ce qui sort de ton compte au quotidien : courses, resto, essence, cadeau… Choisis la catégorie, tape le montant, c'est tout. Le libellé est facultatif."],
   ['💰', 'REVENU', "Salaire, remboursement, vente… Pour de l'argent que tu <b>sors d'un livret, d'un PEA ou d'une assurance vie</b>, passe plutôt par ÉPARGNE › « ↑ Retirer de l'épargne » : il compte aussi comme une rentrée d'argent, et ton épargne nette reste juste."],
-  ['🐷', 'ÉPARGNE', "Uniquement l'argent que tu <b>mets de côté</b> : versement sur un livret, PEA, assurance vie, crypto… On ne retire jamais depuis cet onglet. C'est ce qui remplit ton objectif d'épargne. Un transfert d'un placement à un autre (livret A → PEA) ne se saisit pas : ça se passe dans ton suivi de patrimoine."],
+  ['🐷', 'ÉPARGNE', "Uniquement l'argent que tu <b>mets de côté</b> : versement sur un livret, PEA, assurance vie, crypto… On ne retire jamais depuis cet onglet. C'est ce qui remplit ton objectif d'épargne. Un transfert d'un placement à un autre (livret A → PEA) ne se saisit pas : ça se passe dans ton suivi de patrimoine." + (LIVRETS_LIES ? " <b>Livret A, LDDS, LEP</b> : touche le compte sous « SUR QUEL COMPTE ? », la ligne est recopiée toute seule dans ton fichier Portefeuille &amp; Épargne dans l'heure (les retraits aussi)." : '')],
   ['🔁', 'PRÉLÈVEMENTS RÉGULIERS', "Loyer, abonnements, salaire, virement d'épargne automatique : mets-les une fois dans l'onglet <b>Prévu</b>. Ne les saisis pas en plus ici, sinon ils comptent deux fois."],
   ['👥', "PAYÉ POUR D'AUTRES", "Dans une dépense, touche « Payé pour d'autres » : ta part va dans ton budget, le reste dans « On te doit » jusqu'au remboursement. « À parts égales » divise le montant entre toi et les personnes choisies ; « J'avance tout (0 €) » sert quand tu paies tout pour quelqu'un (ou que tu lui prêtes) : rien ne compte dans ton budget, tout est noté comme dû."],
   ['🏦', 'MON SOLDE (BANQUE + ESPÈCES)', "Quand tu veux, pas seulement en début de mois (⚙ › Chaque mois › Contrôle du solde) : tape ce qu'il y a sur ton compte <b>et</b> le liquide que tu as en poche. Ensuite, l'appli suit les deux toute seule. Si tu oublies les espèces, elle croira qu'il te manque de l'argent."],
@@ -2285,7 +2291,8 @@ function rendreForm() {
       <div style="display:flex;align-items:center;gap:8px"><span class="muted" style="font-size:13px;white-space:nowrap">ou montant précis</span><input class="libin" id="ppart" inputmode="decimal" placeholder="ex. 12,50" value="${esc(String(f.part || '') === '0' ? '' : f.part || '')}" style="margin:0"></div>
       <div class="note" id="presume" style="display:block"></div></div>` : ''}` : ''}
     ${seule ? '' : `<div class="chips">${chips}</div>${tout}`}
-    ${f.type === 'Épargne' ? `${!LS.get('aidesOff', false) ? `<div class="note" style="display:block;margin:-2px 0 8px">${f.sens === 'retrait' ? `Argent que tu <b>sors</b> d'un livret (livret A, LDDS, LEP…), d'un PEA ou d'une assurance vie. Il remet de l'argent sur ton compte (ce n'est pas un revenu) et fait <b>baisser ton épargne nette</b>. Si tu le remets plus tard, saisis-le dans « ↓ Mettre de côté » : les deux s'annulent. Précise le compte dans le libellé (ex. « LDDS »).` : `Argent que tu <b>mets de côté</b> (livrets, PEA, assurance vie, crypto…). Pour de l'argent que tu en sors, choisis « ↑ Retirer ». Pour <b>prêter</b> de l'argent à quelqu'un : DÉPENSE › « 👥 Payé pour d'autres », ma part 0 €.`}</div>` : ''}
+    ${f.type === 'Épargne' ? `${!LS.get('aidesOff', false) ? `<div class="note" style="display:block;margin:-2px 0 8px">${f.sens === 'retrait' ? `Argent que tu <b>sors</b> d'un livret (livret A, LDDS, LEP…), d'un PEA ou d'une assurance vie. Il remet de l'argent sur ton compte (ce n'est pas un revenu) et fait <b>baisser ton épargne nette</b>. Si tu le remets plus tard, saisis-le dans « ↓ Mettre de côté » : les deux s'annulent.${LIVRETS_LIES ? '' : ' Précise le compte dans le libellé (ex. « LDDS »).'}` : `Argent que tu <b>mets de côté</b> (livrets, PEA, assurance vie, crypto…). Pour de l'argent que tu en sors, choisis « ↑ Retirer ». Pour <b>prêter</b> de l'argent à quelqu'un : DÉPENSE › « 👥 Payé pour d'autres », ma part 0 €.`}</div>` : ''}
+      ${LIVRETS_LIES ? (() => { const cur = livretDe(f.lib); return `<div class="grp" style="margin:4px 0">SUR QUEL COMPTE ?</div><div class="chips" style="margin:0 0 4px">${LIVRETS.map(n => `<button class="chip ${cur === n ? 'on' : ''}" data-act="livret" data-n="${n}">${n}</button>`).join('')}<button class="chip ${cur ? '' : 'on'}" data-act="livret" data-n="">Autre placement</button></div><div class="note" style="display:block;margin:0 0 8px">${cur ? `↪ Recopié tout seul dans ton fichier <b>Portefeuille &amp; Épargne</b> (${cur}, ${f.sens === 'retrait' ? 'retrait' : 'apport'}) dans l'heure. Corrige ou supprime la ligne ici : la copie suit.` : 'PEA, assurance vie, crypto… : rien n’est recopié, tu le notes toi-même dans ton portefeuille.'}</div>`; })() : ''}
       ${f.sens === 'retrait' && !catsDuType('Épargne', 'retrait').length ? `<div class="note" style="display:block;margin:-2px 0 8px;color:var(--bad)">Aucune catégorie de retrait dans ton fichier : ajoute une catégorie « Retrait d'épargne » (groupe Épargne) dans ⚙ Réglages › Catégories et favorites.</div>` : ''}` : ''}
     <div class="fsp" id="fsp"></div>
     <input class="libin" id="lib" placeholder="Libellé (facultatif)" value="${esc(f.lib)}" autocomplete="off" maxlength="80" enterkeyhint="done">
@@ -5812,6 +5819,7 @@ document.addEventListener('click', ev => {
     case 'exclus': S.form = { mode: 'exclus', ex: exclusSerie().slice(), retour: S.form && S.form.mode === 'reglages' ? 'reglages' : null }; rendreForm(); ouvrirSheet(); break;
     case 'exclus-tog': { const n = el.dataset.cat, x = S.form.ex; if (!x.includes(n) && !estEssentielle(n)) break; S.form.ex = x.includes(n) ? x.filter(v => v !== n) : x.concat(n); rendreExclus(); break; }
     case 'exclus-ok': { enregistrerExclus(S.form.ex); S._jeu = null; memo = new Map(); const r = S.form.retour; if (r) { S.form = { mode: r }; rendreForm(); } else fermer(); rendre(true); toast("Enregistré : compte à partir d'aujourd'hui"); break; }
+    case 'livret': { const f = S.form, n = el.dataset.n, r = libSansLivret(f.lib); f.lib = n ? n + (r ? ' · ' + r : '') : (livretDe(f.lib) ? r : f.lib); rendreForm(); break; }
     case 'retrait-rev': { const f = S.form, R = catsDuType('Épargne', 'retrait'); if (R.length) { f.type = 'Épargne'; f.sens = 'retrait'; f.cat = R[0].nom; } else { f.type = 'Revenu'; f.cat = catAutreRevenu(); } if (!f.lib) f.lib = 'Retrait livret'; rendreForm(); break; } // (9.20) vers la catégorie de retrait d'épargne quand elle existe
     case 'skin': LS.set('skin', el.dataset.id); rendre(true); toast('Jauge « ' + (SKINS.find(o => o.id === el.dataset.id) || {}).nom + ' » activée'); break;
     case 'accent': LS.set('accent', el.dataset.id); appliquerAccent(); rendre(true); break;
