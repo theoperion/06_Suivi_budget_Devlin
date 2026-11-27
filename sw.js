@@ -1,6 +1,6 @@
 // Chaque appli ne nettoie que SES anciens caches : les 3 applis partagent la même adresse GitHub.
 const PREFIXE = 'jauge-devlin-v';
-const CACHE = PREFIXE + '93';
+const CACHE = PREFIXE + '94';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './moteur.js', './sauvegarde.js', './apps-script/Code.js'];
 // (9.27) Installation : on va chercher les fichiers frais sur le serveur (pas une copie du navigateur vieille de quelques minutes)
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' }))))); self.skipWaiting(); });
