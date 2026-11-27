@@ -342,6 +342,7 @@ body.discret .pbh b{filter:blur(7px)}
 @keyframes tirTombe{0%{transform:translateY(-30px);opacity:0}20%{opacity:1}75%{transform:translateY(12px);opacity:1}100%{transform:translateY(16px);opacity:0}}
 @keyframes tirMonte{from{transform:translateY(var(--d))}to{transform:none}}@keyframes tirBrille{from{opacity:.45}to{opacity:1}}
 .cochon{display:block;margin:0 auto;overflow:visible}.cochon .tirpiece{animation:tirTombe 1s ease-in .3s both}.cochon .tirmonte{animation:tirMonte 1.1s ease-out 1.1s both}.cochon .tirhalo{animation:tirBrille 1.6s ease-in-out 6 alternate both}
+@keyframes tirBalance{0%,100%{transform:rotate(0)}20%{transform:rotate(-5deg)}45%{transform:rotate(4deg)}70%{transform:rotate(-2deg)}}.cochon.tirbalance{animation:tirBalance .9s ease-in-out both;transform-origin:50% 85%}
 [data-theme=dark] .cochon .tircorps{opacity:.62}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}.cochon .tirpiece{display:none}}
 .bilban{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:8px 0 2px;padding:11px 14px;border-radius:12px;color:#fff;background:linear-gradient(90deg,#1D9E75,#2B7FD8,#7B5BD6,#D85A30);background-size:200% 100%;animation:bshift 6s ease-in-out infinite alternate}
@@ -777,7 +778,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.54';
+const VERSION = '9.55';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1749,8 +1750,11 @@ function etatDebutMois() {
   const an = janv ? { n: ca, ok: !ca || LS.get('conseilsVu', 0) === nowYM(), y: now.getFullYear() - 1 } : null;
   const sol = { ok: LS.get('ctrlFait', 0) === nowYM() };
   const obj = now.getMonth() === 0 ? { ok: +objectifs()[now.getFullYear()] > 0, y: now.getFullYear() } : null; // (9.16) janvier : fixer l'objectif d'épargne de l'année
-  if ((!bil || bil.ok) && bud.ok && sol.ok && (!an || an.ok) && (!obj || obj.ok)) return null;
-  return { bil, bud, sol, an, obj };
+  // (9.55) Tirelires avec objectif et date, pas encore pleines : combien mettre ce mois-ci (2 au plus) ; « fait » dès qu'un versement du mois l'atteint
+  const tir = tirelires().filter(t => !t.f).map(t => ({ t, e: etatTirelire(t) })).filter(x => x.e.nm > 0 && (x.e.parMois > 0.5 || x.e.ceMois > 0) && (!x.e.atteint || x.e.ceMois > 0)).sort((a, b) => b.e.parMois - a.e.parMois).slice(0, 2)
+    .map(x => { const besoin = Math.round(Math.max(0, x.e.reste + x.e.ceMois) / x.e.nm); return { t: x.t, besoin, ok: x.e.ceMois >= besoin - 0.5 }; }); // (9.55) part du mois = reste au début du mois ÷ mois restants (net du mois compté une fois), même arrondi que le détail
+  if ((!bil || bil.ok) && bud.ok && sol.ok && (!an || an.ok) && (!obj || obj.ok) && tir.every(x => x.ok)) return null;
+  return { bil, bud, sol, an, obj, tir };
 }
 function carteBilanMois() {
   const E = etatDebutMois(); if (!E) return '';
@@ -1760,6 +1764,7 @@ function carteBilanMois() {
   h += it(E.bud.ok, 'debm-bud', '', 'Ajuster tes budgets', E.bud.n ? E.bud.n + ' conseil' + (E.bud.n > 1 ? 's' : '') + " d'après tes 6 derniers mois" : 'tes budgets sont bien réglés');
   if (E.an) h += it(E.an.ok, 'debm-bud', '', 'Ajuster tes budgets annuels', E.an.n ? 'bilan ' + E.an.y + ' : ' + E.an.n + ' conseil' + (E.an.n > 1 ? 's' : '') : 'tes budgets annuels sont bien réglés');
   if (E.obj) h += it(E.obj.ok, 'obj-edit', '', "Fixer ton objectif d'épargne " + E.obj.y, E.obj.ok ? 'objectif fixé ✓' : "combien veux-tu mettre de côté cette année ? (suggestion d'après ton rythme)");
+  (E.tir || []).forEach(x => { h += it(x.ok, 'tir-verser', `data-n="${esc(x.t.n)}" data-m="${x.besoin}"`, icoTirSp(x.t) + esc(x.t.n) + ' : mets ' + e0(x.besoin) + ' ce mois-ci', x.ok ? 'fait pour ce mois ✓' : 'pour ' + esc(moisCourt(x.t.d)) + ' · touche pour mettre de côté'); });
   h += it(E.sol.ok, 'ctrl', '', 'Contrôle du solde', E.sol.ok ? 'fait pour ce mois ✓' : 'note ce qu\'il y a sur ton compte pour recaler l\'appli');
   return h + '</div>';
 }
@@ -2218,7 +2223,7 @@ function sectionsModeEmploi() {
       ['📊', 'ANNÉE ET MOIS', "En haut de l'onglet Stats : la vue de l'année (mois par mois, ton épargne, la comparaison des années) ou celle du mois (le détail par catégorie). Pratique pour voir où part l'argent. <b>Astuce</b> : glisse le doigt de droite à gauche (ou l'inverse) au milieu de l'écran pour passer d'une vue à l'autre (et, dans Progrès, de Bilans à Défis, Succès, Style). Sur l'accueil et dans le Journal, le même geste change de mois ; dans Prévu, il passe de « Ce mois-ci » à « Tout l'échéancier »."]]],
     ['progres', '🏆', 'PROGRÈS ET DÉFIS', 'Dans Stats › PROGRÈS : bilans, défis, succès et collection. Pour rendre le budget un peu plus amusant.', [
       ['📜', 'BILANS', "Le récap de chaque mois (du 1er au 5) et l'historique."],
-      ['🐷', 'MES TIRELIRES', "Une tirelire par projet (ex. « Japon », 2 000 € pour juin) : crée-la dans Stats › Progrès › Défis › MES TIRELIRES › + NOUVELLE (objectif et date facultatifs), ou depuis + › ÉPARGNE. Ensuite, quand tu mets de côté (ou retires), touche <b>🐷 Japon</b> sous « POUR UN PROJET ». Sur l'accueil : ce qu'elle contient, ce qu'il manque et combien mettre par mois. C'est une <b>partie</b> de ton épargne, pas de l'argent en plus. Ta tirelire est un cochon en verre qui se remplit de pièces : à chaque versement, une pièce tombe (avec un petit son, à couper dans le détail de la tirelire) et le pourcentage monte. Image : choisis-en une, « Aucune », ou tape ton propre emoji. Un message t'encourage à 25, 50 et 75 %. Objectif atteint (au plus tôt le mois suivant sa création) : <b>+25 XP</b> de 200 à 499 €, <b>+60 XP</b> de 500 à 1 499 €, <b>+150 XP</b> dès 1 500 € ; une fois par tirelire, une par mois au plus (la plus grosse), si tu as plus versé que retiré ce mois-là. Pour verser vite : ouvre ta tirelire › <b>↓ METTRE DE CÔTÉ</b> (ou ↑ RETIRER) : la saisie s'ouvre déjà réglée, tu tapes le montant, et tu reviens voir la pièce tomber. Projet fini : ouvre-la › TERMINER."],
+      ['🐷', 'MES TIRELIRES', "Une tirelire par projet (ex. « Japon », 2 000 € pour juin) : crée-la dans Stats › Progrès › Défis › MES TIRELIRES › + NOUVELLE (objectif et date facultatifs), ou depuis + › ÉPARGNE. Ensuite, quand tu mets de côté (ou retires), touche <b>🐷 Japon</b> sous « POUR UN PROJET ». Sur l'accueil : ce qu'elle contient, ce qu'il manque et combien mettre par mois. C'est une <b>partie</b> de ton épargne, pas de l'argent en plus. Ta tirelire est un cochon en verre qui se remplit de pièces : à chaque versement, une pièce tombe (avec un petit son, à couper dans le détail de la tirelire) et le pourcentage monte. Image : choisis-en une, « Aucune », ou tape ton propre emoji. Un message t'encourage à 25, 50 et 75 %. Objectif atteint (au plus tôt le mois suivant sa création) : <b>+25 XP</b> de 200 à 499 €, <b>+60 XP</b> de 500 à 1 499 €, <b>+150 XP</b> dès 1 500 € ; une fois par tirelire, une par mois au plus (la plus grosse), si tu as plus versé que retiré ce mois-là. Dans le détail : « En avance / Il manque … » te dit si tu suis ton rythme jusqu'à la date ; touche le cochon pour rejouer l'animation. Du 1er au 7, la carte « Nouveau mois » te rappelle combien mettre. Pour verser vite : ouvre ta tirelire › <b>↓ METTRE DE CÔTÉ</b> (ou ↑ RETIRER) : la saisie s'ouvre déjà réglée, tu tapes le montant, et tu reviens voir la pièce tomber. Projet fini : ouvre-la › TERMINER."],
       ['🎯', 'DÉFIS', "Stats › Progrès › Défis : tes séries, le défi du mois, le défi de la semaine, la mission et les événements en cours (détail juste en dessous)."],
       ['🏁', 'DÉFI DU MOIS', "C'est toi qui le choisis (Stats › Progrès › Défis) : un budget et un plafond plus serré que d'habitude, <b>au moins 10 % sous le budget</b> (Loisirs 100 € → 90 € au plus). Il se lance <b>du 1er au 5 du mois</b> ; jusqu'au 5 tu peux tout changer ; après le 5, tu peux seulement <b>baisser</b> le plafond (pas le relever, ni changer de budget, ni l'abandonner), et un défi qui n'a pas été lancé attend le mois suivant. Exemple : Loisirs 100 €, défi à 80 € ; le 12, tu peux passer à 70 €, pas à 90 €. Verdict le 1er du mois suivant, seulement si tu as saisi tes dépenses du mois."],
       ['📅', 'DÉFI DE LA SEMAINE', FEAT_DETAIL.semaine],
@@ -4641,8 +4646,13 @@ function etatTirelire(t) {
   for (let y = Math.max(y0, Y - 30); y <= Y; y++) versementsEpargne(y).forEach(x => { if (!x.pret && (y > y0 || x.m >= m0) && normTir(morceauxLib(x.lib).pop()) === k) L.push(Object.assign({ y }, x)); });
   const verse = L.filter(x => !x.retrait).reduce((a, x) => a + x.v, 0), retire = L.filter(x => x.retrait).reduce((a, x) => a + x.v, 0), total = verse - retire;
   const o = +t.o > 0 ? +t.o : null, reste = o ? Math.max(0, o - total) : null;
-  let parMois = null; if (o && t.d && /^\d{4}-\d\d$/.test(t.d)) { const nm = (+t.d.slice(0, 4) - Y) * 12 + (+t.d.slice(5, 7)) - (now.getMonth() + 1) + 1; parMois = nm > 0 ? reste / nm : null; }
-  return { L, verse, retire, total, o, reste, frac: o ? Math.max(0, Math.min(1, total / o)) : null, parMois, atteint: !!o && total >= o - 0.005 };
+  let parMois = null, nm = null; if (o && t.d && /^\d{4}-\d\d$/.test(t.d)) { nm = (+t.d.slice(0, 4) - Y) * 12 + (+t.d.slice(5, 7)) - (now.getMonth() + 1) + 1; parMois = nm > 0 ? reste / nm : null; }
+  // (9.55) Rythme : où il faudrait en être aujourd'hui, à parts égales du début du mois de création à la fin du mois visé
+  let avance = null; if (o && t.d && /^\d{4}-\d\d$/.test(t.d)) { const deb = y0 * 12 + m0, fin = +t.d.slice(0, 4) * 12 + (+t.d.slice(5, 7)), cur = Y * 12 + now.getMonth() + 1;
+    const T = fin - deb + 1, ecoule = cur - deb + (now.getDate() - 1) / dim(Y, now.getMonth() + 1); if (T > 0) avance = total - o * Math.max(0, Math.min(1, ecoule / T)); }
+  // Versé ce mois-ci (pour le rappel du début de mois)
+  const ceMois = L.filter(x => x.y === Y && x.m === now.getMonth() + 1).reduce((a, x) => a + (x.retrait ? -x.v : x.v), 0); // net du mois (versé − retiré)
+  return { L, verse, retire, total, o, reste, frac: o ? Math.max(0, Math.min(1, total / o)) : null, parMois, nm, avance, ceMois, atteint: !!o && total >= o - 0.005 };
 }
 const EMOJIS_TIR = ['🐷', '✈️', '🏝️', '🗾', '🏔️', '🏰', '🚗', '🏠', '🎁', '🎓', '💍', '🎮'];
 // (9.52) Cochon rose en verre (choix de Théo, maquette D) : les pièces montent avec le pourcentage ; halo doré à 100 % ;
@@ -4655,9 +4665,9 @@ function cochonTir(f, nom, o) {
   if (f > 0) for (let y = 130 - r * 0.5; y > lim - r * 0.4; y -= r * 0.62) for (let x = 40 + rnd() * r; x < 162; x += r * 1.55 + rnd() * 3) {
     const rx = r * (0.9 + rnd() * 0.25), ry = rx * (0.38 + rnd() * 0.3), a = (rnd() - 0.5) * 40, dy = (rnd() - 0.5) * 4;
     pc += `<g transform="translate(${x.toFixed(1)} ${(y + dy).toFixed(1)}) rotate(${a.toFixed(0)})"><ellipse rx="${rx.toFixed(1)}" ry="${(ry + 2.2).toFixed(1)}" cy="2" fill="#B07A00"/><ellipse rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="url(#or${id})" stroke="#9A6A00" stroke-width=".8"/><ellipse rx="${(rx * 0.62).toFixed(1)}" ry="${(ry * 0.6).toFixed(1)}" fill="none" stroke="#FFF1A8" stroke-width=".9" opacity=".8"/></g>`; }
-  const plein = f >= 0.999, monte = o.monte > 0 ? Math.round(Math.min(90, o.monte * 90)) : 0;
+  const plein = f >= 0.999, monte = o.monte > 0 ? Math.round(Math.min(90, o.monte * 90)) : 0, baisse = !monte && o.baisse > 0 ? Math.round(Math.min(90, o.baisse * 90)) : 0;
   if (monte) { TIR_PLEIN = TIR_PLEIN || plein; clearTimeout(TIR_T); TIR_T = setTimeout(() => { sonTirelire(TIR_PLEIN); TIR_PLEIN = false; animerPctTir(); }, 1050); } // la pièce touche le tas
-  return `<svg class="cochon" viewBox="0 0 200 ${o.pct ? 165 : 150}" width="${W}" role="img" aria-label="Tirelire ${o.pct ? Math.round(f * 100) + ' %' : ''}"><defs>
+  return `<svg class="cochon${o.rejoue ? ' tirbalance' : ''}" viewBox="0 0 200 ${o.pct ? 165 : 150}" width="${W}" role="img" aria-label="Tirelire ${o.pct ? Math.round(f * 100) + ' %' : ''}"><defs>
     <radialGradient id="or${id}" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#FFF3B0"/><stop offset=".45" stop-color="#F7C948"/><stop offset="1" stop-color="#C98F00"/></radialGradient>
     <clipPath id="cl${id}"><ellipse cx="100" cy="84" rx="60" ry="44"/></clipPath>${plein ? `<radialGradient id="gl${id}"><stop offset=".55" stop-color="#FFE27A" stop-opacity=".6"/><stop offset="1" stop-color="#FFE27A" stop-opacity="0"/></radialGradient>` : ''}</defs>
     ${plein ? `<ellipse class="tirhalo" cx="100" cy="84" rx="94" ry="72" fill="url(#gl${id})"/>` : ''}
@@ -4665,7 +4675,7 @@ function cochonTir(f, nom, o) {
     <rect x="62" y="112" width="15" height="25" rx="5" fill="#E98FA6"/><rect x="123" y="112" width="15" height="25" rx="5" fill="#E98FA6"/>
     <path d="M70 46 L77 20 L93 42 Z" fill="#F4A9BB" stroke="#C96F88" stroke-width="2"/>
     <ellipse class="tircorps" cx="100" cy="84" rx="60" ry="44" fill="#F4A9BB" opacity=".35"/>
-    <g clip-path="url(#cl${id})"><g ${monte ? `class="tirmonte" style="--d:${monte}px"` : ''}>${pc}</g></g>
+    <g clip-path="url(#cl${id})"><g ${monte ? `class="tirmonte" style="--d:${monte}px"` : baisse ? `class="tirmonte" style="--d:-${baisse}px"` : ''}>${pc}</g>${o.marques ? [0.25, 0.5, 0.75].map(k => `<line x1="44" x2="56" y1="${130 - 90 * k}" y2="${130 - 90 * k}" stroke="#5a2a3a" stroke-width="4" stroke-linecap="round" opacity=".55"/><line x1="44" x2="56" y1="${130 - 90 * k}" y2="${130 - 90 * k}" stroke="#fff" stroke-width="2" stroke-linecap="round"/><text x="59" y="${133.5 - 90 * k}" font-size="10.5" font-weight="700" fill="#fff" stroke="#5a2a3a" stroke-width="2.6" paint-order="stroke" font-family="IBM Plex Mono,monospace">${k * 100}</text>`).join('') : ''}</g>
     <ellipse cx="100" cy="84" rx="60" ry="44" fill="#F4A9BB" opacity=".12"/><ellipse cx="100" cy="84" rx="60" ry="44" fill="none" stroke="#E07C99" stroke-width="3.5"/>
     <path d="M62 62 q18 -20 50 -22" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".6"/>
     <rect x="86" y="38" width="28" height="5" rx="2.5" fill="#7a3d50"/>
@@ -4690,6 +4700,7 @@ function animerPctTir() {
   document.querySelectorAll('.tirpct[data-a]').forEach(z => { const de = +z.dataset.de, a = +z.dataset.a; delete z.dataset.a; if (!animOK()) { z.textContent = a + ' %'; return; }
     const t0 = performance.now(), step = n => { const k = Math.min(1, (n - t0) / 900); z.textContent = Math.round(de + (a - de) * (1 - Math.pow(1 - k, 3))) + ' %'; if (k < 1) requestAnimationFrame(step); }; requestAnimationFrame(step); });
 }
+function baisseTir(t, e) { const V = LS.get('tirVu', {}), avant = V[normTir(t.n)]; return avant == null || e.total >= avant - 0.005 ? 0 : remplTir(t, Object.assign({}, e, { total: avant, frac: e.o ? Math.max(0, Math.min(1, avant / e.o)) : 0 })) - remplTir(t, e); }
 function pctAvantTir(t, e) { const V = LS.get('tirVu', {}), av = V[normTir(t.n)]; return e.o && av != null ? Math.max(0, Math.min(100, Math.round(av / e.o * 100))) : null; }
 const pctTir = (t, e, cls) => { const a = Math.round(e.frac * 100), de = monteTir(t, e) > 0 ? pctAvantTir(t, e) : null; return de != null && de < a ? `<${cls || 'b'} class="tirpct" data-de="${de}" data-a="${a}">${de} %</${cls || 'b'}>` : `<${cls || 'b'}>${a} %</${cls || 'b'}>`; };
 // Remplissage dessiné : % de l'objectif ; sans objectif, quelques pièces dès qu'il y a de l'argent.
@@ -4722,6 +4733,7 @@ function suiviTirelires() {
   tirelires().filter(t => !t.f && +t.o > 0).forEach(t => { const e = etatTirelire(t), pal = Math.min(4, Math.floor(e.frac * 4 + 1e-9)), k = normTir(t.n);
     if (e.atteint && !t.a) { majTirPref(t.n, { a: auj() }); S._etat = null; memo = new Map(); } // le jeu relit tout de suite (carte « +60 XP » maintenant)
     if (!(k in P)) { P[k] = pal; return; } // première fois : pas d'annonce pour ce qui était déjà là
+    if (pal > P[k] && pal === 4) setTimeout(() => { try { celebrer(); } catch (x) {} }, 1200); // (9.55) la fête choisie dans la collection, à 100 % seulement
     if (pal > P[k]) msg.push(icoTirSp(t) + t.n + ' : ' + ['', 'un quart est là !', 'la moitié est là !', 'les trois quarts sont là !', 'objectif atteint, bravo !'][pal] + ' (' + e0(e.total) + ' sur ' + e0(e.o) + ')');
     P[k] = pal; });
   LS.set('tirPal', P); if (msg.length) toast(msg.join(' · '));
@@ -4731,7 +4743,7 @@ const moisCourt = d => /^\d{4}-\d\d$/.test(d || '') ? MOIS[+d.slice(5, 7) - 1].t
 function ligneTirelire(t) {
   const e = etatTirelire(t);
   const sous = e.o ? (e.atteint ? '🎉 objectif atteint' : `encore ${e0(e.reste)}${e.parMois != null ? `<br>≈ <b>${e0(e.parMois)}/mois</b> d'ici ${moisCourt(t.d)}` : t.d ? `<br>date passée (${moisCourt(t.d)})` : ''}`) : (e.total ? 'sans objectif' : 'pas encore de versement');
-  return `<button class="tl objl" data-act="tir-voir" data-n="${esc(t.n)}" style="width:100%;text-align:left;align-items:center${t.f ? ';opacity:.6' : ''}"><span style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:62px">${cochonTir(remplTir(t, e), t.n, { w: 62, monte: monteTir(t, e) })}</span><span>${icoTirSp(t)}${esc(t.n)}${t.f ? ' · terminée' : ''}${e.o ? ` · ${pctTir(t, e)}` : ''}<small class="muted" style="display:block;font-size:12px">${sous}</small></span></span><span class="${e.total < 0 ? 'c-bad' : ''}">${e.total < 0 ? '−' + e0(-e.total) : e0(e.total)}${e.o ? `<small class="muted" style="display:block;font-size:12px;text-align:right">sur ${e0(e.o)}</small>` : ''}</span></button>`;
+  return `<button class="tl objl" data-act="tir-voir" data-n="${esc(t.n)}" style="width:100%;text-align:left;align-items:center${t.f ? ';opacity:.6' : ''}"><span style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:62px">${cochonTir(remplTir(t, e), t.n, { w: 62, monte: monteTir(t, e), baisse: baisseTir(t, e) })}</span><span>${icoTirSp(t)}${esc(t.n)}${t.f ? ' · terminée' : ''}${e.o ? ` · ${pctTir(t, e)}` : ''}<small class="muted" style="display:block;font-size:12px">${sous}</small></span></span><span class="${e.total < 0 ? 'c-bad' : ''}">${e.total < 0 ? '−' + e0(-e.total) : e0(e.total)}${e.o ? `<small class="muted" style="display:block;font-size:12px;text-align:right">sur ${e0(e.o)}</small>` : ''}</span></button>`;
 }
 function blocTirelires() {
   const T = tirelires(), A = T.filter(t => !t.f), F = T.filter(t => t.f);
@@ -4756,9 +4768,11 @@ function rendreTirDetail() {
   const t = tirelires().find(x => x.n === S.form.n); if (!t) { fermer(); return; }
   const e = etatTirelire(t);
   let h = enteteSheet(icoTirSp(t) + t.n.toUpperCase(), null);
-  if (e.o) h += `<div class="obj ${e.atteint ? 'win' : ''}"><div style="text-align:center;margin-top:8px">${cochonTir(e.frac, t.n, { w: 230, pct: true, monte: monteTir(t, e), de: monteTir(t, e) > 0 ? pctAvantTir(t, e) : null })}</div><div class="objn"><b>${e.total < 0 ? '−' + e0(-e.total) : e0(e.total)}</b><span>sur ${e0(e.o)}</span></div></div>`;
-  else h += `<div style="text-align:center;margin-top:8px">${cochonTir(remplTir(t, e), t.n, { w: 210, monte: monteTir(t, e) })}</div><div class="objn" style="margin:6px 0 14px"><b>${e.total < 0 ? '−' + e0(-e.total) : e0(e.total)}</b><span>dans la tirelire</span></div>`;
+  if (e.o) h += `<div class="obj ${e.atteint ? 'win' : ''}"><div style="text-align:center;margin-top:8px" data-act="tir-rejouer" role="button" aria-label="Rejouer l'animation">${cochonTir(e.frac, t.n, { w: 230, pct: true, marques: true, monte: S.tirRejoue ? Math.max(0.06, monteTir(t, e)) : monteTir(t, e), baisse: baisseTir(t, e), rejoue: S.tirRejoue, de: monteTir(t, e) > 0 ? pctAvantTir(t, e) : null })}</div><div class="objn"><b>${e.total < 0 ? '−' + e0(-e.total) : e0(e.total)}</b><span>sur ${e0(e.o)}</span></div></div>`;
+  else h += `<div style="text-align:center;margin-top:8px" data-act="tir-rejouer" role="button" aria-label="Rejouer l'animation">${cochonTir(remplTir(t, e), t.n, { w: 210, monte: S.tirRejoue ? Math.max(0.06, monteTir(t, e)) : monteTir(t, e), baisse: baisseTir(t, e), rejoue: S.tirRejoue })}</div><div class="objn" style="margin:6px 0 14px"><b>${e.total < 0 ? '−' + e0(-e.total) : e0(e.total)}</b><span>dans la tirelire</span></div>`;
   h += `<div class="note" style="display:block;text-align:center">${e.o ? (e.atteint ? '🎉 Objectif atteint, bravo !' : `Encore <b>${e0(e.reste)}</b>${e.parMois != null ? ` · ≈ <b>${e0(e.parMois)} par mois</b> jusqu'en ${moisCourt(t.d)}` : t.d ? ` · date passée (${moisCourt(t.d)})` : ''}`) : 'Sans objectif.'}<br>Versé ${e0(e.verse)} · retiré ${e0(e.retire)} · depuis ${moisCourt(t.c)}</div>`;
+  if (!LS.get('tirTouche', false)) h += `<div class="note" style="display:block;text-align:center;margin:2px 0 0;font-size:12px">👆 Touche le cochon pour le faire tinter</div>`; // (9.55) disparaît après le premier toucher
+  if (e.avance != null && !e.atteint && !t.f) h += `<div class="note" style="display:block;text-align:center;margin-top:4px;font-size:14px">${e.avance >= 0.5 ? `✅ <b class="c-ok">En avance de ${e0(e.avance)}</b> sur ton rythme` : e.avance > -0.5 ? '✅ Pile dans les temps' : `⏳ <b>Il manque ${e0(-e.avance)}</b> pour être dans les temps`}</div>`; // (9.55)
   if (!t.f) h += `<div style="display:flex;gap:8px;margin:10px 0 4px"><button class="go" style="flex:1.4;margin:0" data-act="tir-verser" data-n="${esc(t.n)}">↓ METTRE DE CÔTÉ</button><button class="ghost" style="flex:1;margin:0" data-act="tir-retirer" data-n="${esc(t.n)}">↑ RETIRER</button></div>`; // (9.54) saisie ÉPARGNE déjà réglée sur cette tirelire
   h += `<div class="note" style="display:block">Comptent : les versements et retraits où tu as choisi <b>${icoTirSp(t)}${esc(t.n)}</b> (sous « POUR UN PROJET »). C'est une partie de ton épargne, pas de l'argent en plus. Touche une ligne pour la corriger.</div>`;
   if (!e.L.length) h += `<div class="empty">Aucun mouvement pour l'instant.</div>`;
@@ -5035,6 +5049,7 @@ function appliquerCosmetiques() {
 }
 // --- Fêtes ---
 function celebrer() {
+  if (Date.now() - (S._fete || 0) < 4000) return; S._fete = Date.now(); // (9.55) une seule fête à la fois (tirelire pleine + carte du jeu)
   let f = cos('fete'); if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   if (f === 'confettis') return confettis();
   const cv = document.createElement('canvas'), W = innerWidth, H = innerHeight; cv.width = W; cv.height = H; cv.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:99';
@@ -5996,7 +6011,8 @@ document.addEventListener('click', ev => {
     case 'tir-verser': case 'tir-retirer': { const n = el.dataset.n, ret = a === 'tir-retirer'; ouvrirSaisie(null); if (!S.form || S.form.mode !== 'add') break;
       const f = S.form, C = catsDuType('Épargne', ret ? 'retrait' : 'verser');
       if (ret && !C.length) { f.type = 'Revenu'; f.cat = catAutreRevenu(); } else { f.type = 'Épargne'; f.sens = ret ? 'retrait' : 'verser'; f.cat = C.length ? C[0].nom : null; }
-      f.lib = libAvecTirelire('', n); S.retourTir = n; rendreForm(); break; }
+      f.lib = libAvecTirelire('', n); if (el.dataset.m) f.montant = String(el.dataset.m); else S.retourTir = n; rendreForm(); break; } // (9.55) depuis « Nouveau mois » : montant proposé, retour à l'accueil
+    case 'tir-rejouer': LS.set('tirTouche', true); S.tirRejoue = true; debloquerSon(); rendreForm(); S.tirRejoue = false; break; // (9.55) toucher le cochon : il se balance, une pièce retombe, avec le son
     case 'tir-voir': S.form = { mode: 'tirdetail', n: el.dataset.n }; rendreForm(); ouvrirSheet(); break;
     case 'tir-ligne': { const e = trouver(el.dataset.id); if (e) ouvrirSaisie(e); break; }
     case 'tir-finies': S.tirFinies = !S.tirFinies; rendre(true); break;
