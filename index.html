@@ -778,7 +778,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.59';
+const VERSION = '9.60';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -2276,6 +2276,9 @@ function blocReelSaisie(f) {
   return echDeSaisie(f).map(x => `<div class="note" style="display:block;margin:2px 0 8px">📅 <b>${esc(x.lib || x.cat)}</b> prévu en ${esc(MOIS[f.m - 1].toLowerCase())} : <b>${e2(echMontant(x, f.y, f.m))} €</b> ${qi('reel')}
     <div style="display:flex;gap:6px;margin-top:6px"><input class="libin reelsai" data-id="${esc(x.id)}" inputmode="decimal" placeholder="Montant réel ${f.type === 'Revenu' ? 'reçu' : 'payé'} s'il est différent" style="margin:0"><button class="chip" data-act="reel-saisie" data-id="${esc(x.id)}" style="height:42px;white-space:nowrap">NOTER L'ÉCART</button></div><div class="reelh" data-id="${esc(x.id)}" style="margin-top:4px"></div></div>`).join('');
 }
+function lierReelSaisie() { document.querySelectorAll('#sheetIn .reelsai').forEach(i => i.addEventListener('input', () => majReelSaisie(i))); }
+// (9.60) Changer de catégorie ne redessine pas tout le formulaire : on met l'encadré à jour à part (et le gros bouton reprend son rôle)
+function majReelBox() { const z = $('#reelbox'); if (!z || !S.form) return; z.innerHTML = blocReelSaisie(S.form); lierReelSaisie(); const go = document.querySelector('#sheetIn .go[data-ecart]'); if (go) { go.textContent = go.dataset.orig; go.dataset.act = 'save'; delete go.dataset.ecart; } }
 function majReelSaisie(inp) {
   const f = S.form, x = trouverEch(inp.dataset.id), z = document.querySelector(`.reelh[data-id="${CSS.escape(inp.dataset.id)}"]`), r = numTxt(inp.value); if (!x || !z) return;
   // Le gros bouton du bas suit : « NOTER L'ÉCART DE +37,88 € » tant que le champ est rempli (sinon il reprend son rôle)
@@ -2325,7 +2328,7 @@ function rendreForm() {
       <div style="display:flex;align-items:center;gap:8px"><span class="muted" style="font-size:13px;white-space:nowrap">ou montant précis</span><input class="libin" id="ppart" inputmode="decimal" placeholder="ex. 12,50" value="${esc(String(f.part || '') === '0' ? '' : f.part || '')}" style="margin:0"></div>
       <div class="note" id="presume" style="display:block"></div></div>` : ''}` : ''}
     ${seule ? '' : `<div class="chips">${chips}</div>${tout}`}
-    ${blocReelSaisie(f)}
+    <div id="reelbox">${blocReelSaisie(f)}</div>
     ${f.type === 'Épargne' ? `${!LS.get('aidesOff', false) ? `<div class="note" style="display:block;margin:-2px 0 8px">${f.sens === 'retrait' ? `Argent que tu <b>sors</b> d'un livret (livret A, LDDS, LEP…), d'un PEA ou d'une assurance vie. Il remet de l'argent sur ton compte (ce n'est pas un revenu) et fait <b>baisser ton épargne nette</b>. Si tu le remets plus tard, saisis-le dans « ↓ Mettre de côté » : les deux s'annulent.${LIVRETS_LIES ? '' : ' Précise le compte dans le libellé (ex. « LDDS »).'}` : `Argent que tu <b>mets de côté</b> (livrets, PEA, assurance vie, crypto…). Pour de l'argent que tu en sors, choisis « ↑ Retirer ». Pour <b>prêter</b> de l'argent à quelqu'un : DÉPENSE › « 👥 Payé pour d'autres », ma part 0 €.`}</div>` : ''}
       ${LIVRETS_LIES ? (() => { const cur = livretDe(f.lib); return `<div class="grp" style="margin:4px 0">SUR QUEL COMPTE ${qi('livrets')}</div><div class="chips" style="margin:0 0 4px">${LIVRETS.map(n => `<button class="chip ${cur === n ? 'on' : ''}" data-act="livret" data-n="${n}">${n}</button>`).join('')}<button class="chip ${cur ? '' : 'on'}" data-act="livret" data-n="">Autre placement</button></div><div class="note" style="display:block;margin:0 0 8px">${cur ? `↪ Recopié tout seul dans ton fichier <b>Portefeuille &amp; Épargne</b> (${cur}, ${f.sens === 'retrait' ? 'retrait' : 'apport'}) dans l'heure. Corrige ou supprime la ligne ici : la copie suit.` : 'PEA, assurance vie, crypto… : rien n’est recopié, tu le notes toi-même dans ton portefeuille.'}</div>`; })() : ''}
       ${(() => { const A = tirelires().filter(t => !t.f), cur = tirelireDe(f.lib, A); if (!A.length) return f.sens === 'retrait' ? '' : `<button class="lnk" data-act="tir-new-saisie" style="display:block;margin:0 0 8px">🐷 CRÉER UNE TIRELIRE DE PROJET (EX. UN VOYAGE) ›</button>`; return `<div class="grp" style="margin:4px 0">POUR UN PROJET ${qi('projet')}</div><div class="chips" style="margin:0 0 8px">${A.map(t => `<button class="chip ${cur && cur.n === t.n ? 'on' : ''}" data-act="tir-pick" data-n="${esc(t.n)}">${icoTirSp(t)}${esc(t.n)}</button>`).join('')}<button class="chip ${cur ? '' : 'on'}" data-act="tir-pick" data-n="">Aucun</button>${f.sens === 'retrait' ? '' : `<button class="chip" data-act="tir-new-saisie" style="border-style:dashed">+ Nouvelle</button>`}</div>`; })()}
@@ -2339,7 +2342,7 @@ function rendreForm() {
     <button class="go" data-act="save">${f.mode === 'edit' ? 'ENREGISTRER LES MODIFS' : futur ? 'PRÉVOIR POUR ' + esc(MOIS[f.m - 1].toUpperCase()) : 'ENREGISTRER'}</button>
     ${f.mode === 'edit' ? `<button class="ghost" data-act="dup">DUPLIQUER CE MOIS-CI</button><button class="danger ${f.arm ? 'armed' : ''}" data-act="del">${f.arm ? 'TOUCHE ENCORE POUR SUPPRIMER' : 'SUPPRIMER LA LIGNE'}</button>` : ''}</div>`;
   $('#lib').addEventListener('input', ev => { S.form.lib = ev.target.value; majSugLib(); });
-  document.querySelectorAll('#sheetIn .reelsai').forEach(i => i.addEventListener('input', () => majReelSaisie(i)));
+  lierReelSaisie();
   // (9.26) Montant d'abord (pavé de l'appli), puis libellé au clavier du téléphone : « Entrée » enregistre directement
   $('#lib').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); ev.target.blur(); enregistrer(); } });
   majLibEtat();
@@ -5947,7 +5950,7 @@ document.addEventListener('click', ev => {
     case 'obj-ligne': { const e = trouver(el.dataset.id), y = S.form && S.form.y; if (e) { ouvrirSaisie(e); S.retourObj = y; } break; } // 9.36 : retour au détail après la fiche
     case 'sens': S.form.sens = el.dataset.s; if (S.form.cat && (S.form.sens === 'retrait') !== estRetraitEp(S.form.cat)) S.form.cat = null; rendreForm(); break;
     case 'type': S.form.type = el.dataset.t; S.form.sens = null; if (S.form.cat && typeDe(S.form.cat) !== S.form.type) S.form.cat = null; rendreForm(); break;
-    case 'cat': S.form.cat = el.dataset.cat; if (S.form.all) { S.form.all = false; rendreForm(); break; } document.querySelectorAll('#sheetIn [data-act=cat]').forEach(c => c.classList.toggle('on', c.dataset.cat === S.form.cat)); majHint(); majSugLib(); break;
+    case 'cat': S.form.cat = el.dataset.cat; if (S.form.all) { S.form.all = false; rendreForm(); break; } document.querySelectorAll('#sheetIn [data-act=cat]').forEach(c => c.classList.toggle('on', c.dataset.cat === S.form.cat)); majHint(); majSugLib(); majReelBox(); break;
     case 'all': S.form.all = !S.form.all; rendreForm(); break;
     case 'save': enregistrer(); break;
     case 'soon': S.form = { mode: 'soon', k: el.dataset.k }; rendreForm(); ouvrirSheet(); break;
