@@ -778,7 +778,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.57';
+const VERSION = '9.58';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -1383,7 +1383,8 @@ function enregistrerExclus(L) {
 // dans le Journal (l'Échéancier n'est jamais dans le Journal, donc les prélèvements automatiques ne cassent rien).
 // Les lignes « Écart … » (correction d'un montant de l'Échéancier) ne cassent rien. Les catégories cochées non plus.
 function estFixeManuelle(cat, lib) { const c = catMap()[cat]; return !!c && c.type === 'Dépense' && FIX.includes(c.groupe) && !estAv(cat) && !/^[ée]carts?\b/i.test(String(lib || '').trim()); } // « Écart », « écart », « Ecart », « ecart »… (9.31)
-function casseSerie(cat, ex, lib, iso) { return (estCourante(cat) || estFixeManuelle(cat, lib)) && !(ex || exclusSerie(iso)).includes(cat); }
+const estEcart = lib => /^[ée]carts?\b/i.test(String(lib || '').trim()); // « Écart … » (correction d'un montant prévu), sans tenir compte des majuscules/accents
+function casseSerie(cat, ex, lib, iso) { return !estEcart(lib) && (estCourante(cat) || estFixeManuelle(cat, lib)) && !(ex || exclusSerie(iso)).includes(cat); } // (9.58, décision de Théo du 27/11) un écart ne casse JAMAIS un jour sans dépense, quelle que soit la catégorie
 // Jours complets sans dépense courante d'affilée (aujourd'hui n'est compté qu'une fois fini).
 // (lot L2) Même règle que le jeu (joursJeu) : plus de marqueur « derDep » gardé sur le téléphone (il restait après la suppression d'une ligne).
 function joursSansDepense() {
@@ -3296,7 +3297,7 @@ const saisiEntre = (a, b) => S.journal.some(e => estDepenseSaisie(e) && e.date >
 // (9.33) Preuve d'usage d'une période [a, b] (événement, saison, semaine) : même règle que les jours sans dépense,
 // une dépense saisie entre a − 7 j et b + 7 j. 'ok' = prouvée ; 'attente' = pas encore, mais b + 7 j n'est pas passé ; 'non' = jamais saisie.
 function preuvePeriode(a, b) { if (saisiEntre(addJ(a, -JOURS_PREUVE), addJ(b, JOURS_PREUVE))) return 'ok'; return addJ(b, JOURS_PREUVE) >= auj() ? 'attente' : 'non'; }
-const estDepenseSaisie = e => { const c = catMap()[e.cat]; return !e.deleted && !!e.date && e.montant > 0 && !!c && c.type === 'Dépense'; };
+const estDepenseSaisie = e => { const c = catMap()[e.cat]; return !e.deleted && !!e.date && e.montant > 0 && !!c && c.type === 'Dépense' && !estEcart(e.lib); }; // (9.58) un écart n'est pas une preuve de saisie
 function joursJeuCalc() {
   const exA = exclusParDate(), datees = S.journal.filter(e => !e.deleted && e.date && e.montant > 0);
   const dep = new Set(datees.filter(e => casseSerie(e.cat, exA(e.date), e.lib)).map(e => e.date));
@@ -3312,7 +3313,7 @@ function joursJeuCalc() {
 const finSerie = arr => { let c = 0; for (let i = arr.length - 1; i >= 0; i--) { if (arr[i] === null) continue; if (!arr[i]) break; c++; } return c; };
 const maxSerie = arr => { let b = 0, c = 0; arr.forEach(v => { c = v === null ? c : v ? c + 1 : 0; b = Math.max(b, c); }); return b; };
 // (lot L2) Un mois ne peut gagner un sceau (vert, sans faute, 10 %/25 % non dépensés, défi, mois bouclé…) que s'il contient des dépenses saisies.
-function moisSaisi(y, m) { const cm = catMap(); return S.journal.some(e => !e.deleted && e.y === y && e.m === m && e.montant > 0 && cm[e.cat] && cm[e.cat].type === 'Dépense'); }
+function moisSaisi(y, m) { const cm = catMap(); return S.journal.some(e => !e.deleted && e.y === y && e.m === m && e.montant > 0 && cm[e.cat] && cm[e.cat].type === 'Dépense' && !estEcart(e.lib)); } // (9.58) un écart seul ne prouve pas que le mois est tenu à jour
 // (lot L2) Bilan du mois SANS les retraits d'épargne (catégorie Retrait, ou revenu reconnu par estRetraitEp) :
 // retirer 1 500 € de son livret ne rend pas un mois « vert » et ne gonfle pas le « non dépensé ».
 // Calculé directement depuis les lignes (c.par) : juste quelle que soit la façon dont calc() range ces retraits.
@@ -4857,7 +4858,7 @@ function calcResume(k) {
   let t4 = 0; for (let w = 1; w <= 4; w++) { const d0 = new Date(l); d0.setDate(d0.getDate() - 7 * w); const d1 = new Date(d0); d1.setDate(d1.getDate() + 6); t4 += depCourantes(isoJ(d0), isoJ(d1)).reduce((t, e) => t + e.montant, 0); }
   const par = {}; L.forEach(e => par[e.cat] = (par[e.cat] || 0) + e.montant);
   const top = Object.entries(par).sort((x, y) => y[1] - x[1]).slice(0, 3), gros = L.slice().sort((x, y) => y.montant - x.montant)[0] || null;
-  const exS = exclusSerie(), jd = new Set(L.filter(e => casseSerie(e.cat, exS)).map(e => e.date)); let sans = 0, vus = 0; const lim = auj();
+  const exS = exclusSerie(), jd = new Set(L.filter(e => casseSerie(e.cat, exS, e.lib)).map(e => e.date)); let sans = 0, vus = 0; const lim = auj();
   for (let i = 0; i < 7; i++) { const d = new Date(l); d.setDate(d.getDate() + i); const s = isoJ(d); if (s > lim) break; vus++; if (!jd.has(s)) sans++; }
   const W = semaines()[k], defi = W ? { cat: W.cat, montant: W.montant, dep: depSemaine(W.cat, l) } : null;
   // la semaine qui vient : prélèvements et revenus prévus
