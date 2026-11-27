@@ -773,7 +773,7 @@ body.discret .ticket .tl span.achn{filter:none}
 
 <script>
 /* ================= CONFIG ================= */
-const VERSION = '9.49';
+const VERSION = '9.50';
 const HEURES_SEMAINE_DEFAUT = 35; // heures de contrat par semaine (réglable dans Achats plaisir)
 // Toutes les fonctionnalités (jeu, défis, séries, bilans, alertes, saisons, semaine, résumé, objectif, collection…) sont actives pour tout le monde :
 // plus d'interrupteurs dans Réglages. on() reste pour ne pas toucher aux appels ; l'ancienne préférence locale « off » est ignorée.
@@ -2206,6 +2206,7 @@ function sectionsModeEmploi() {
       ['🧾', 'LE JOURNAL', "Chaque dépense, revenu ou épargne saisi, du plus récent au plus ancien. Change de mois avec ‹ ›, cherche un libellé ou filtre par catégorie. <b>Touche une ligne</b> pour la corriger ou la supprimer."]]],
     ['prevu', '📅', 'PRÉVU', 'Ce qui va tomber : prélèvements réguliers et achats à venir.', [
       ['🔁', "L'ÉCHÉANCIER", "Loyer, abonnements, salaire, virement d'épargne automatique : saisis-les <b>une fois</b>, ils comptent chaque mois tout seuls (ou chaque trimestre, chaque année…). Touche une ligne pour la modifier, la mettre en pause, noter le montant réel du mois ou un nouveau montant à partir d'un mois."],
+      ['💶', 'SALAIRE (OU PRÉLÈVEMENT) DIFFÉRENT CE MOIS-CI', "Ton salaire est dans l'Échéancier à 1 757,60 € mais tu as touché <b>1 719,72 €</b> (retenue, prime, remboursement de transport…) ? Ne change pas l'Échéancier : onglet <b>Prévu</b> › touche la ligne du salaire › « MONTANT RÉEL EN NOVEMBRE » › tape <b>1719,72</b> › <b>OK</b>. L'appli ajoute toute seule au Journal une ligne « Écart Salaire nov. » de <b>−37,88 €</b> : novembre est juste, et les mois suivants restent à 1 757,60 €. Même geste pour un loyer ou un abonnement qui change un seul mois. Si le montant change <b>pour de bon</b>, plus bas dans la même fiche : « LE MONTANT CHANGE POUR DE BON » › nouveau montant › « À PARTIR DE » (tes mois passés restent justes)."],
       ['🛒', 'ACHATS ET REVENUS À VENIR', "Un achat prévu pour plus tard compte déjà dans ta fin de mois. Le jour venu, l'accueil te demande « C'est fait ? » : PAYÉ ✓ l'ajoute au Journal."]]],
     ['stats', '📊', 'STATS', 'Tes chiffres dans le temps.', [
       ['📊', 'ANNÉE ET MOIS', "En haut de l'onglet Stats : la vue de l'année (mois par mois, ton épargne, la comparaison des années) ou celle du mois (le détail par catégorie). Pratique pour voir où part l'argent. <b>Astuce</b> : glisse le doigt de droite à gauche (ou l'inverse) au milieu de l'écran pour passer d'une vue à l'autre (et, dans Progrès, de Bilans à Défis, Succès, Style). Sur l'accueil et dans le Journal, le même geste change de mois ; dans Prévu, il passe de « Ce mois-ci » à « Tout l'échéancier »."]]],
